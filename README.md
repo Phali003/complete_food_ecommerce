@@ -1,2 +1,2 @@
 # Food-Ecommerce
-A food E-commerce that enables people to buy food online and get instant delivery to their destinations at their comfort.
+Fresh Eats Market Online is a dynamic e-commerce platform dedicated to bringing the freshest and highest quality groceries directly to your doorstep. Our mission is to make healthy eating accessible and convenient by offering a wide variety of farm-fresh produce, organic products, and artisanal goods.
