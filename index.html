@@ -3,106 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Menu Icon</title>
+    <title>Welcome to Fresh Eats Market Online</title>
     <link rel="stylesheet" href="menu.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <link rel="stylesheet" href="modal.css">
 </head>
 <body>
-   
-    <section class="logo">
-        <img src="Fork.jpg" class="headerImage"> Fresh Eats Market Online
-    </section>
-    <button type="button" id="signBtn">Sign Up/ Sign In</button>
-  
-    
-<div id="signUpModal" class="modal">
-    <div class="modal-content">
-        <span class="close" id="closeSignUp">&times;</span>
-        <h1 class="signUpHeader">Sign Up</h1>
-        <input type="text" placeholder="Username" id="signUpUsername"><br><br>
-        <input type="email" placeholder="Email" id="signUpEmail"><br><br>
-        <input type="password" placeholder="Password" id="signUpPassword"><br><br>
-        <button type="button" id="submitSignUp" class="signButton">Sign Up</button> <button type="button" class="signButton" id="switchToSignIn">Sign In</button>
-    </div>
-</div>
-
-
-<div class="modal" id="signInModal">
-    <div class="modal-content">
-        <span class="close" id="closeSignIn">&times;</span>
-        <h2 class="signInHeader">Sign In</h2>
-        <input type="text" placeholder="Username or Email" id="signInUsername"><br><br>
-        <input type="password" placeholder="Password" id="signInPassword"><br><br>
-        <button type="button" id="switchToSignUp" class="signButton">Sign Up</button><button type="button" id="submitSignIn" class="signButton">Sign In</button>
-        
-    </div>
-</div>
-
-    <div class="commerceContainer">
-        
+    <h1>Welcome to Fresh Eats Market Online</h1>
+    <nav>
         <ul>
-            <li><a class="active" href="#">Visit Home Page</a></li>
-            <li><a class="active" href="#">Browse products</a></li>
-            <li><a class="active" href="#">Add to Cart</a></li>
-            <li><a class="active" href="#">View Cart</a></li>
-            <li><a class="active" href="#">Proceed to Check out</a></li>
-            <li><a class="active" href="#">Place order</a></li>
-            <li><a class="active" href="#">Order Confirmation</a></li>
+            <li><a href="signIn.html">Sign In</a></li>
+            <li><a href="signUp.html">Sign Up</a></li>
+            <li><a href="menu.html">Menu</a></li>
+            <li><a href="todolistApp.html">To-Do List App</a></li>
+            <li><a href="trial.html">Trial Page</a></li>
+           
+            <a href="https://phali003.github.io/Food-Ecommerce/"></a>
         </ul>
-    </div>
-
-    <input type="text" id="searchProduct" placeholder="Search your product here">
-    <button type="button" id="searchBtn"><i class="fas fa-search"></i><b>Search</b></button><br><br>
-
-<article class="sectionOne" id="section"><b><i>Welcome to Fresh Eats Market Online!</i></b>
-<br>
-    Discover the Best Quality and Freshest Foods
-    Welcome to Fresh Eats Market Online! Discover the best quality and freshest foods at unbeatable prices. Whether you're looking for daily groceries or special treats, we've got you covered. Start your shopping journey with us and experience convenience and satisfaction like never before. Happy shopping!</article>
-    <section class="sectionTwo" id="section"><p>Fresh Eats Market Online has the best quality produce I've ever purchased. The delivery is always on time, and the customer service is Fantastic !!!</section>
-    
-        <div class="myImges">
-            <a href="#"> <div class="cont "><img src="plated-bagel-lox.jpg"><p1 class="image">platter of bagels accompanied by assorted garnishes including smoked salmon, cream cheese, cucumber slices, lemon wedges, and cherry tomatoes.<b><i>Price:$30.78</i></b></p1></div></a>
-            <a href="#"> <div class="cont "><img src="pancakes-made-better-with-syrup.jpg"><p2 class="image"><b><i>Pancakes with Strawberries</i></b>A stack of fluffy pancakes topped with sliced strawberries and drizzled with syrup. Powdered sugar is sprinkled on top<b><i>Price: $10.0</i></b></p2></div></a>
-            <a href="#"> <div class="cont "><img src="pizza-and-wine-dinner (1).jpg"><p3 class="image"><b><i>Dining Setup with Pizzas and Drinks: </i></b>A cozy dining setup featuring two small pizzas, a bottle of red wine, and a colorful array of drinks garnished with fruits and herbs.<b><i>Price:$60.0</i></b></p3></div></a>
-            <a href="#"> <div class="cont "><img src="flat-lay-of-baked-bread-with-apples-and-oats.jpg"><p7 class="image"><b><i>Rustic Breakfast Spread:</i></b>rustic setting with a loaf of bread and several slices of bread on a plate. Accompanied by apples, a bowl of cooked apples.<b><i>Price: $14.0</i></b></p7></div></a>
-            <a href="#"> <div class="cont "><img src="a-fresh-brewed-pot-of-filter-coffee.jpg"><p4 class="image"><b><i>Pour-over Coffee:</i></b>A steaming cup of coffee in a wooden pour-over coffee maker.<b><i>price: $5</i></b></p4></div></a>
-            <a href="#"> <div class="cont "><img src="juice-42560_1280.png"><p5 class="image"><b><i>Orange Juice:</i></b>A glass of orange juice with a green straw.<b><i>Price: $5</i></b></p5></div></a>
-            <a href="#"> <div class="cont "><img src="plated-bagel-lox.jpg"><p6 class="image"><b><i>Bagels with Salad:</i></b>A plate of assorted bagels and a colorful salad with vegetables and smoked salmon. <b><i>Price: $12.0</i></b></p6></div></a>
-            <a href="#"><div class="cont"><img src="hand-holds-up-a-two-scoop-ice-cream-cone.jpg"><p7 class="image"><b><i>Ice Cream Cone:</i></b>Ice Cream Cone with chocolate and vanila.<b><i>Price: $3.5</i></b></p7></div></a>
-            <a href="#"><div class="cont"><img src="brooke-lark-HjWzkqW1dgI-unsplash.jpg"><p8 class="image"><b><i>Assorted Desserts:</i></b>A colorful dessert, including cupcakes and pastries, arranged on a wooden table.<b><i> Price: $15.00</i></b></p8></div></a>
-            <a href="#"><div class="cont"><img src="champagne-35314_1280.png"><p9 class="image"><b><i>Champagne:</i></b>A glass of champagne with a light yellow hue.<b><i>Price: $10.0</i></b></p9></div></a>
-            <a href="#"><div class="cont"><img src="a-cocktail-with-a-touch-of-class.jpg"><p10 class="image"><b><i>Cocktails:</i></b>Cocktails with ice and garnished with herbs.<b><i>Price: $12.0</i></b></p10></div></a>
-            <a href="#"><div class="cont"><img src="black-coffee-and-a-croissant.jpg"><p11 class="image"><b><i>A cup of coffee with a croissant:</i></b>A steaming cup of coffee with a fresh croissant.<b><i>Price: $5.0</i></b></p11></div></a>
-            <a href="#"><div class="cont"><img src="sparkling-wine-to-celebrate.jpg"><p12 class="image"><b><i>A bottle of champagne with a golden bow:</i></b>A festive bottle of champagne decorated with a golden bow and streamers.<b><i>Price: $35.0</i></b></p12></div></a>
-            <a href="#"><div class="cont"><img src="pizza-and-wine-dinner.jpg"><p13 class="image"><b><i>Pizza with Red Wine:</i></b>A bottle of red wine, two filled wine glasses, and a pizza topped with greens and cheese.<b><i>Price: $27.0</i></b></p13></div></a>
-            <a href="#"><div class="cont"><img src="bacon-and-eggs-breakfast.jpg"><p14 class="image"><b><i>Breakfast Plate:</i></b>A plate with scrambled eggs, bacon, asparagus, cherry tomatoes, fried potatoes, and a glass of orange juice.<b><i>Price: $13.5</i></b></p14></div></a>
-            <a href="#"><div class="cont"><img src="pexels-dadanr-27772885.jpg"><p20 class="image"><b><i>Grilled Tomahawk Steak:</i></b>A large, grilled tomahawk steak garnished with rosemary, grilled tomatoes, roasted garlic, crispy potato wedges, and a small salad.<b><i>Price: $40.3</i></b> </p20></div></a>
-            <a href="#"><div class="cont"><img src="fried-chicken-wings-pub-food.jpg"><p16 class="image"><b><i>Fried Chicken Wings:</i></b>A basket of fried chicken wings garnished with chopped green onions.<b><i>Price: $12.0</i></b></p16></div></a>
-            <a href="#"><div class="cont"><img src="pexels-cescrz-3185509.jpg"><p18 class="image"><b><i>Cheesecake with Berry Sauce:</i></b>A slice of cheesecake drizzled with dark berry sauce.<b><i>Price: $6.5</i></b></p18></div></a>
-            <a href="#"><div class="cont"><img src="pexels-rdne-8964280.jpg"><p19 class="image"><b><i>Grilled Fish Fillet:</i></b>A grilled fish fillet garnished with a lemon wedge and greens.<b><i>Price: $18.35</i></b></p19></div></a>
-            <a href="#"><div class="cont"><img src="pexels-dadanr-27772885.jpg"><p20 class="image"><b><i>Mixed Berries:</i></b>A bowl of fresh mixed berries including strawberries, blueberries, and raspberries.<b><i>Price: $7.5</i></b></p20></div></a>
-            <a href="#"><div class="cont"><img src="flat-lay-of-baked-bread-with-apples-and-oats.jpg"><p15 class="image"><b><i>Rustic Bread and Spread:</i></b>A rustic setting with a plate of sliced bread, a loaf of bread, a small bowl of spread or dip, apples, and a jar of pickled vegetables.<b><i>Price: $10.5</i></b></p15></div></a>
-
-            
-        </div>
-    <section class="testimonials">
-        <h3>What Our Customers Say</h3>
-        <div class="testimonial">
-            <p>"Fresh Eats Market Online has the best quality produce I've ever purchased. The delivery is always on time, and the customer service is fantastic!" - Sarah M.</p>
-            <p>"I love the variety of organic options available. Fresh Eats Market Online is my go-to for all my grocery needs!" - John D.</p>
-        </div>
-    </section>
-    <section class="newsletter-signup">
-        <h3>Stay Updated</h3>
-        <form id="signup-form">
-            <input type="email" placeholder="Enter your email" required>
-            <button type="submit" id="subscribeButton">Subscribe</button>
-        </form>
-    </section>
-        
-    <script src="menu.js"></script>
-    <script src="signUp.js"></script>
-    <script src="signIn.js"></script>
+    </nav>
 </body>
 </html>
