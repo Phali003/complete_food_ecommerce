@@ -20,5 +20,5 @@ Fresh Eats Market Online is a dynamic e-commerce platform dedicated to bringing 
 ![Checkout Page Screenshot](./screenshots/3.png)
 
 ## Visit Us
-[Visit Fresh Eats Market Online](https://Phali003.github.io/Food-Ecommerce)
+[Visit Fresh Eats Market Online](https://Phali003.github.io/Food-Ecommerce)   // [https://phali003.github.io/Food-Ecommerce/]
 
