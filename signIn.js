@@ -4,37 +4,40 @@ document.addEventListener("DOMContentLoaded", function() {
 
     signinBtn.addEventListener("click", function(event) {
         event.preventDefault();
-
+    
         let signinUsername = document.getElementById("signInUsername").value;
         let signinPassword = document.getElementById("signInPassword").value;
-
-        // Check if user exists in localStorage
-        let storedUser = JSON.parse(localStorage.getItem('user'));
-
-        if (!storedUser) {
+    
+        // Check if users exist in localStorage
+        let storedUsers = JSON.parse(localStorage.getItem('users')) || [];
+    
+        if (storedUsers.length === 0) {
             alert("User does not exist. Please sign up first.");
-            return; // Exit the function if user does not exist
+            return; // Exit the function if no users exist
         }
-
+    
         // Validate username and password
         if (validateUsername(signinUsername) && validatePassword(signinPassword)) {
-            if (storedUser.username === signinUsername) {
-                if (storedUser.password === signinPassword) {
-                    alert(`Logged in successfully, ${signinUsername}`);
-                    loggedIn = true;
-
-                    // Redirect to another page
-                    window.location.href = "menu.html";
-                } else {
-                    alert("Wrong password, try again!!");
-                    loggedIn = false;
-                }
+            // Check if the user exists in the stored users array
+            const user = storedUsers.find(user => user.Username === signinUsername && user.Password === signinPassword);
+            
+            if (user) {
+                alert(`Logged in successfully, ${signinUsername}`);
+                loggedIn = true;
+                 // Clear the input fields after successful sign-in for security purposes and reducing confusion
+        document.getElementById("signUpUsername").value = "";
+        document.getElementById("signUpPassword").value = "";
+      
+    
+                // Redirect to another page
+                window.location.href = "menu.html";
             } else {
-                alert("Wrong username, try again!!");
+                alert("Wrong username or password, try again!!");
                 loggedIn = false;
             }
         }
     });
+    
 
     function validateUsername(signinUsername) {
         const check_signinUsername = /^[A-Z][a-zA-Z0-9]{5,}$/;

@@ -1,0 +1,71 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-shadow:none;
+    color: rgb(250, 250, 250);
+}
+body{
+    background-color: #06D001;
+    display: block;
+    position: relative;
+    padding: 10px;
+    text-align: center;
+}
+
+.homePage-container .header, .header1{
+    color: #0051ff;
+    text-align: center;
+}
+.paragraph{
+    margin-left: -10px;
+    padding-top: 12px;
+    display: inline-block;
+    color: #201717;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: large;
+    font-weight: 600;
+}
+
+.header1{
+    font-size: 2em;
+    animation: fadeInOut 3s infinite;
+    transition: .5s;
+}
+
+.followPage i{
+    font-size: 30px;
+    color: #B23256;
+    padding-right: .5em;
+}
+.followPage{
+    color: #00005C;
+    text-decoration: underline 2px solid black ;
+    font-size: larger;
+}
+
+
+
+
+
+
+
+
+
+
+@keyframes fadeInOut {
+    0%{
+        opacity: 0.45;
+        font-size: 2em;
+        transition: .5s;
+
+    }
+    50%{
+        opacity: 1;
+        font-size: 2em;
+        transition: .5s;
+
+    }
+    100%{
+        opacity: 0.35;
+    }
+}

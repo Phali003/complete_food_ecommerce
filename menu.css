@@ -6,7 +6,12 @@
     list-style: none;
 }
 body{
-    background-color: #0079FF;
+
+    background-image: url("backgroundImage.jpg");
+    background-size:contain ;
+    background-repeat: no-repeat;
+    height: 200vh;
+   
 
 }
 section.logo {
@@ -24,22 +29,60 @@ section.logo {
 
    
 }
-#signBtn{
-    margin-top: 10px;
-    background-color: #279219;
-    padding: 10px;
-    border: none;
-    border-radius: 20px;
+#signBtn {
+    min-width: 120px;
     font-weight: 700;
     font-size: large;
-    float: right;
-    transition: .3s ease;
-}
-#signBtn:hover{
-    background-color: #1eff00; 
+    position: relative;
     cursor: pointer;
-    color: #FF0080;
-}
+    float: right;
+    padding: 12px 17px;
+    border: 0;
+    border-radius: 7px;
+  
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    background: radial-gradient(
+      ellipse at bottom,
+      rgba(71, 81, 92, 1) 0%,
+      rgb(0, 228, 0) 45%
+    );
+  
+    color: rgb(255, 255, 255, 0.66);
+  
+    transition: all 1s cubic-bezier(0.15, 0.83, 0.66, 1);
+  }
+  
+  #signBtn::before {
+    content: "";
+    width: 70%;
+    height: 1px;
+  
+    position: absolute;
+    bottom: 0;
+    left: 15%;
+  
+    background: rgb(255, 255, 255);
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 1) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    opacity: 0.2;
+  
+    transition: all 1s cubic-bezier(0.15, 0.83, 0.66, 1);
+  }
+  
+  #signBtn:hover {
+    color: rgb(255, 255, 255, 1);
+    transform: scale(1.1) translateY(-3px);
+  }
+  
+  #signBtn:hover::before {
+    opacity: 1;
+  }
+  
+
 .headerImage{
     width: 200px;
     display: inline-flex;
@@ -119,36 +162,115 @@ ul li a:hover{
     font-size: larger;
     background-color: #13634d;
     border: none;
-    margin-left: 20px;
+    margin-left: 0;
     display: inline-block;
+    top: 4em;
+}
+.browseProduct{
+    transition: .5s ease;
+    margin-top: 10px;
+    padding: 50px;
+    border-radius: 10px;
+    font-size: 2rem;
+    background-color: #ff0000;
+    border: none;
+    margin-left: 0;
+    display: block;
+    position: relative;
+    z-index: 1000;
+    top: 4em;
+    left: 3em;
 }
 #searchProduct::placeholder{
     color: black;
     text-align: center;
 }
-#searchBtn{
-    font-size: larger;
-    padding: 10px;
-    border-radius: 20%;
-    border: none;
-    background-color: #280274;
-    cursor: pointer;
-    margin-left: 0;
-    display: inline-block;
+
+.browseProduct::placeholder{
+    color: black;
+    text-align: center;
 }
 
+#searchBtn {
+    display: inline-block;
+    padding: 5px 10px;
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    text-decoration: none;
+    color: #fff;
+    background-color: #0b00a7;
+    border: 2px solid #000;
+    border-radius: 10px;
+    box-shadow: 5px 5px 0px #000;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+  
+  #searchBtn:hover {
+    background-color: #fff;
+    color: #ff5252;
+    border: 2px solid #ff5252;
+    box-shadow: 5px 5px 0px #ff5252;
+  }
+  
+  #searchBtn:active {
+    background-color: #fcf414;
+    box-shadow: none;
+    transform: translateY(4px);
+  }
+  
 .myImages{
+
+    background-image: url("backgroundImage.jpg");
+    background-size:contain ;
+    background-repeat: repeat;
+    height: 100vh;
     width: 100%;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     margin-top: 20px;
 }
-.myImages img {
-    width: 40vw; 
-    height: 40vh; 
+.myImages img{
+    align-items: center;
+    width: 30vw; 
+    height: 35vh; 
     margin: 10px; 
     padding: 10px;
+}
+.foundProduct{
+    position: relative;
+    width: 100%;
+    display: block;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 20px;
+    align-items: flex-start;
+    width: 30vw; 
+    height: 35vh; 
+    margin: 10px; 
+    padding: 10px;
+    top: -10em;
+}
+
+.foundProduct-reset{
+    position: relative;
+    width: 100%;
+    display: block;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 20px;
+    align-items: flex-start;
+    width: 30vw; 
+    height: 35vh; 
+    margin: 10px; 
+    padding: 10px;
+    top: 0;
+}
+
+.hiddenProduct {
+    display: none !important;
 }
 
 .modal{
@@ -195,7 +317,7 @@ input::placeholder{
     text-align: center;
 }
 
-.signButton, #subscribeButton{
+ #subscribeButton{
     background-color: #004db1;
     padding: 2px;
     font-size: larger;
@@ -205,79 +327,127 @@ input::placeholder{
     font-weight: 900;
     transition: .5s ease;
 }
-.signButton:hover, #subscribeButton:hover{
+ #subscribeButton:hover{
     background-color: #05832f;
     cursor: pointer;
 }
 
+
+
+.signButton {
+    --color: #560bad;
+    font-family: inherit;
+    display: inline-flex;
+    width: 5em;
+    padding-bottom: 2.5em;
+    float: left;
+    padding-left: .5em;
+    gap: 2em;
+    text-align: center;
+    height: 2em;
+    
+    line-height: 2.5em;
+    margin: 2px;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+    border: 2px solid var(--color);
+    transition: color 0.5s;
+    z-index: 1;
+    font-size: 17px;
+    border-radius: 6px;
+    font-weight: 500;
+    color: var(--color);
+  }
+  
+  .signButton:before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    background: var(--color);
+    height: 150px;
+    width: 200px;
+    border-radius: 50%;
+  }
+  
+  .signButton:hover {
+    color: #fff;
+  }
+  
+  .signButton:before {
+    top: 100%;
+    left: 100%;
+    transition: all 0.7s;
+  }
+  
+  .signButton:hover:before {
+    top: -30px;
+    left: -30px;
+  }
+  
+  .signButton:active:before {
+    background: #3a0ca3;
+    transition: background 0s;
+  }
+  
+
 #section, .testimonial{
-    color: #0a0f09;
+    background-color: #00d3c8;
+    color: #40128B;
     text-align: center;
     font-size: larger;
     font-weight: 500;
     text-decoration-color: #1eff00;
     font-family: Verdana, Geneva, Tahoma, sans-serif;
 }
-/* 
-.foodImage{
-    width: 20vw;
-    height: 20vh;
-    display: flex;
-} */
 .myImages{
+    flex-wrap: wrap;
     width: 100%;
     height: auto;
     background-color: aqua;
     transition: .5s ease;
+  justify-content: center;
+    display: flex;
+    z-index: 1000;
 }
 .cont{
-    padding: 10px;
+    padding: 30px;
     text-align: center;
     width: auto;
-    height: 30vh;
+    height: auto;
     margin: 60px 8px 0;
     text-align: center;
     background-color: #000000;
-    display: inline-flex;
+    display: flex;
     position: relative;
     color: black;
     transition: .5s ease;
     /* padding-left: 10px; */
 }
 
+button:hover{
+    cursor: pointer;
+}
 
  .image{
     color: red;
     text-align: left;
     font-size: medium;
     font-weight: 700;
-    width: auto;
+    width: 35vw;
     height: auto;
     display: none;
     position: absolute;
     z-index: 1000;
     transition: .1s ease;
     padding-left: 5px;
+    text-align: center;
 
 }
 a:hover .image{
     display: block;
     transition: .1s ease;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 @media (max-width: 667px) {
     label.logo {
@@ -347,9 +517,10 @@ ul li{
 
 .myImages{
     width: 100%;
-    display: flex;
+    height: auto;
+    display: inline-flex;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: start;
     margin-top: 20px;
 }
 .myImages img {
@@ -359,3 +530,21 @@ ul li{
     padding: 5px;
 }
 }
+
+ .addToCart{
+    background-color: #f3f7fe;
+    color: #3b82f6;
+    border: none;
+    cursor: pointer;
+    border-radius: 8px;
+    width: auto;
+    height: 30px;
+    transition: 0.3s;
+  }
+  
+  .addToCart:hover {
+    background-color: #3b82f6;
+    box-shadow: 0 0 0 5px #3b83f65f;
+    color: #fff;
+  }
+  
