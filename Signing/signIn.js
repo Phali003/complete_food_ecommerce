@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", function() {
       
     
                 // Redirect to another page
-                window.location.href = "menu.html";
+                window.location.href = "index.html";
             } else {
                 alert("Wrong username or password, try again!!");
                 loggedIn = false;
