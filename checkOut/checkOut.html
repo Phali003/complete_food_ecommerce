@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="checkOut.css" >
+</head>
+<body>
+  <div class="containerCheckOut">
+    
+      <p class="headLine">Confirm that these are your items you want to order</p>
+      <ol id="checkOut"></ol>
+      <div class="Pricecontainer">
+    <p id="totalPrice">Total Price  = $</p>
+    <p id="total-amount" ></p>
+    </div>
+    
+    <p class="welcomeMessage">Welcome! We're excited to help you with your order. To ensure a smooth and efficient process, please provide us with the following details:</p>     
+      <section>
+        
+          <p class="userInfo">Provide User Information</p><br>
+          <div class="container">
+              <input required="" type="text" name="text" class="input" id="signInUsername">
+              <label class="label">Username</label>
+            </div><br>
+            <div class="container">
+            <input required="" type="email" name="text" class="input" id="signInEmail">
+            <label class="label">Email</label>
+          </div><br>
+          <div class="container">
+          <input required="" type="number" name="text" class="input" id="phoneNumber">
+          <label class="label">Phone Number</label>
+        </div>
+    <br>
+        <div class="container">
+          <input required="" type="text" name="text" class="input" id="address">
+          <label class="label">Street Address</label>
+        </div>
+        <br>
+        <div class="container">
+          <input required="" type="text" name="text" class="input" id="city">
+          <label class="label">City</label>
+        </div> <br>
+        <div class="container">
+          <input required="" type="text" name="text" class="input" id="country">
+          <label class="label">Country</label>
+        </div>
+      </section>
+      <br>
+
+<div class="Payment-Details">Payment-Details</div>
+
+<div class="Card-Name" id="Card-Name">Cardholder's Name</div>
+<i class="fa-solid fa-address-book"></i>
+<input  type="text" class="nameInput" placeholder="Your Name" id="nameInput" required><br>
+
+
+<div class="Card-Number" id="Card-Number">Card Number</div>
+<i class="fa-solid fa-house-laptop"></i>
+<input type="number" class="numberInput" placeholder="Card Number" id="numberInput" required><br>
+<br>
+<button type="button" class="placeOrder">Place Order</button>
+<p class="welcomeMessage">
+
+Rest assured, your information is safe with us. We value your privacy and are committed to protecting your personal data. Thank you for choosing us! <br>
+
+</p>
+      <script src="checkOut.js"></script>
+  </div>
+</body>
+</html>

@@ -152,7 +152,8 @@ let cartList = document.getElementById("cartList");
 
 addbuttons.forEach(button => {
     button.addEventListener("click", addToCart);
-});function addToCart(event) {
+});
+function addToCart(event) {
     let itemName = event.target.getAttribute("data-item-name");
     let itemPrice = event.target.getAttribute("data-item-price");
     let cart = JSON.parse(localStorage.getItem("cart")) || [];

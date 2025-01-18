@@ -85,7 +85,9 @@ section.logo {
     opacity: 1;
   }
   
-
+.cartStyle{
+    top: 0;
+}
 .headerImage{
     width: 200px;
     display: inline-flex;

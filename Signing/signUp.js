@@ -4,6 +4,7 @@ let users = JSON.parse(localStorage.getItem('users')) || []; // Load users from 
 
 //Function to pre-fill the sign-up form if the user data exists
 
+
 function preFillForm(){
     document.getElementById("signUpUsername").addEventListener("focus", function(){
         if (users.length > 0 && this.value === ""){
