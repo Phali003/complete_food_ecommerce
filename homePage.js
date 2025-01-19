@@ -164,6 +164,15 @@ function addToCart(event) {
     listItems.textContent = `${itemName} - $${itemPrice}`;
     alert(`${itemName} added to cart successfully!`);
     cartList.appendChild(listItems);
+
+    let products = document.querySelectorAll(".myImages .cont");
+    products.forEach(function(product) {
+        product.style.display = "inline-flex"; 
+        product.classList.remove("foundProduct"); 
+        product.style.top = "-20em";
+        product.style.position = "";
+        product.style.zIndex = "";
+    });
     
     const deleteButton = document.createElement("button");
     deleteButton.textContent = "Remove item";
@@ -177,12 +186,5 @@ function addToCart(event) {
     });
 
     // Reset display for all products
-    let products = document.querySelectorAll(".myImages .cont");
-    products.forEach(function(product) {
-        product.style.display = "inline-flex"; 
-        product.classList.remove("foundProduct"); 
-        product.style.top = "-20em";
-        product.style.position = "";
-        product.style.zIndex = "";
-    });
+ 
 }
