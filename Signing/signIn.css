@@ -1,57 +1,57 @@
-body{
-    margin: 0;
-    padding: 0;
-    align-items: center;
-    background-color: rgb(0, 240, 40);
+body {
+  margin: 0;
+  padding: 0;
+  align-items: center;
+  background-color: rgb(0, 240, 40);
 }
-.e-commerce{
-    background-color: #FFB200;
-    display:block;
-    width: 500px;
-    position: fixed;
-    top: 25%;
-    left: 10%;
-    transform: translate(-10%, -25%);
-    height: 400px;
-    margin-left: 25%;
-    margin-top: 10%;
-    border-radius: 6%;
-    text-align: center;
-    user-select: none;
+.e-commerce {
+  background-color: #ffb200;
+  display: block;
+  width: 500px;
+  position: fixed;
+  top: 25%;
+  left: 10%;
+  transform: translate(-10%, -25%);
+  height: 400px;
+  margin-left: 25%;
+  margin-top: 10%;
+  border-radius: 6%;
+  text-align: center;
+  user-select: none;
 }
 
-.eCommerceSignUp{
-    z-index: 1;
-    opacity: 1;
-    background-color: #FFB200;
-    display:block;
-    width: 500px;
-    position: fixed;
-    top: 25%;
-    left: 10%;
-    transform: translate(-10%, -25%);
-    height: 400px;
-    margin-left: 25%;
-    margin-top: 10%;
-    border-radius: 6%;
-    text-align: center;
-    user-select: none;
+.eCommerceSignUp {
+  z-index: 1;
+  opacity: 1;
+  background-color: #ffb200;
+  display: block;
+  width: 500px;
+  position: fixed;
+  top: 25%;
+  left: 10%;
+  transform: translate(-10%, -25%);
+  height: 400px;
+  margin-left: 25%;
+  margin-top: 10%;
+  border-radius: 6%;
+  text-align: center;
+  user-select: none;
 }
-.eCommerceSignIn{
-    z-index: -1111;
-    background-color: #FFB200;
-    display:block;
-    width: 500px;
-    position: fixed;
-    top: 25%;
-    left: 10%;
-    transform: translate(-10%, -25%);
-    height: 400px;
-    margin-left: 25%;
-    margin-top: 10%;
-    border-radius: 6%;
-    text-align: center;
-    user-select: none;
+.eCommerceSignIn {
+  z-index: -1111;
+  background-color: #ffb200;
+  display: block;
+  width: 500px;
+  position: fixed;
+  top: 25%;
+  left: 10%;
+  transform: translate(-10%, -25%);
+  height: 400px;
+  margin-left: 25%;
+  margin-top: 10%;
+  border-radius: 6%;
+  text-align: center;
+  user-select: none;
 }
 /* }
 
