@@ -1,61 +1,779 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-shadow: none;
-  color: rgb(250, 250, 250);
-}
-body {
-  background-color: #06d001;
-  display: block;
-  position: relative;
-  padding: 10px;
-  text-align: center;
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+
+/* Define Color Scheme and Variables */
+:root {
+  /* Primary Colors */
+  --primary: #4a69bd;
+  --primary-dark: #1e3799;
+  --primary-light: #6a89cc;
+  
+  /* Secondary Colors */
+  --secondary: #ff6b6b;
+  --secondary-light: #ff9e7d;
+  --secondary-dark: #eb3b5a;
+  
+  /* Accent Colors */
+  --accent: #20bf6b;
+  --accent-light: #26de81;
+  --accent-dark: #0fb9b1;
+  
+  /* Neutral Colors */
+  --text-dark: #2d3748;
+  --text-light: #718096;
+  --text-white: #f7fafc;
+  --background: #f9f9fb;
+  --card-bg: #ffffff;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--secondary) 0%, var(--secondary-dark) 100%);
+  --gradient-accent: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+  --gradient-light: linear-gradient(to right, rgba(255,255,255,0.1), rgba(255,255,255,0.2));
+  
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 14px 28px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.08);
+  
+  /* Timing and Effects */
+  --transition-speed: 0.3s;
+  --transition-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Sizing */
+  --border-radius: 8px;
+  --border-radius-lg: 12px;
+  --container-width: 1200px;
+  
+  /* Typography */
+  --font-heading: "Poppins", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.homePage-container .header,
-.header1 {
-  color: #0051ff;
-  text-align: center;
-}
-.paragraph {
-  margin-left: -10px;
-  padding-top: 12px;
-  display: inline-block;
-  color: #201717;
-  font-family: Verdana, Geneva, Tahoma, sans-serif;
-  font-size: large;
-  font-weight: 600;
-}
-
-.header1 {
-  font-size: 2em;
-  animation: fadeInOut 3s infinite;
-  transition: 0.5s;
-}
-
-.followPage i {
-  font-size: 30px;
-  color: #b23256;
-  padding-right: 0.5em;
-}
-.followPage {
-  color: #00005c;
-  text-decoration: underline 2px solid black;
-  font-size: larger;
+/* Animation Keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fadeInOut {
   0% {
-    opacity: 0.45;
-    font-size: 2em;
-    transition: 0.5s;
+    opacity: 0.7;
+    transform: translateY(-10px);
   }
   50% {
     opacity: 1;
-    font-size: 2em;
-    transition: 0.5s;
+    transform: translateY(0);
   }
   100% {
-    opacity: 0.35;
+    opacity: 0.7;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes shine {
+  from { background-position: -200% center; }
+  to { background-position: 200% center; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ripple {
+  from {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0.6;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+}
+
+/* Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  color: var(--text-dark);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px; /* Adjust based on your header height */
+}
+
+body {
+  background-color: var(--background);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  padding: 0;
+  text-align: center;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Consistent Section Spacing */
+.homePage-container {
+  padding: 2rem 1rem;
+  max-width: var(--container-width);
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Enhanced Header */
+.homePage-container .header,
+.header1 {
+  color: var(--primary-dark);
+  text-align: center;
+  font-family: var(--font-heading);
+  margin-bottom: 2rem;
+  position: relative;
+  animation: fadeIn 1s ease-out;
+}
+.header1 {
+  font-size: 2.5em;
+  font-weight: 700;
+  padding: 1.5rem;
+  animation: fadeInOut 3s var(--transition-bounce) infinite;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+  will-change: transform, opacity;
+}
+}
+
+.header1::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: var(--gradient-light);
+  transform: skewX(-25deg);
+  animation: shine 3s ease-in-out infinite;
+  opacity: 0.5;
+}
+
+/* Enhanced Paragraph */
+.paragraph {
+  margin: 1.5rem auto;
+  padding: 1.5rem;
+  display: block;
+  color: var(--text-dark);
+  font-family: var(--font-body);
+  font-size: 1.1rem;
+  font-weight: 500;
+  line-height: 1.8;
+  max-width: 800px;
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
+  animation: fadeIn 1s ease-out;
+  position: relative;
+  border-left: 4px solid var(--accent);
+  will-change: transform;
+}
+
+.paragraph:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Social Media Section */
+/* Note: Main followPage styles are consolidated in the Social Container section below */
+
+/* Enhanced Footer Design */
+.footer {
+  margin-top: auto;
+  padding: 3rem 1rem;
+  background: var(--gradient-primary);
+  color: var(--text-white);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 -5px 10px rgba(0, 0, 0, 0.05);
+  z-index: 1;
+}
+
+.footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--gradient-accent);
+}
+
+.footer-content {
+  max-width: var(--container-width);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  padding: 1rem;
+}
+
+.footer-section {
+  text-align: left;
+  animation: fadeIn 1s ease-out;
+}
+
+.footer-section h3 {
+  color: var(--text-white);
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  position: relative;
+  padding-bottom: 0.5rem;
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+.footer-section h3::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 50px;
+  height: 2px;
+  background: var(--accent-light);
+}
+
+.footer-section p,
+.footer-section a {
+  color: var(--text-white);
+  margin: 0.5rem 0;
+  text-decoration: none;
+  display: block;
+  transition: transform var(--transition-speed) ease,
+              color var(--transition-speed) ease;
+  font-family: var(--font-body);
+}
+
+.footer-section a:hover {
+  transform: translateX(5px);
+  color: var(--accent-light);
+}
+
+/* Social Media Links */
+.social-links {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.social-links a {
+  color: var(--text-white);
+  font-size: 1.5rem;
+  transition: transform var(--transition-speed) var(--transition-bounce),
+              color var(--transition-speed) ease;
+}
+
+.social-links a:hover {
+  transform: translateY(-5px);
+  color: var(--accent-light);
+}
+
+/* Copyright Section */
+.copyright {
+  text-align: center;
+  padding: 1rem;
+  margin-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-white);
+  font-size: 0.9rem;
+  font-family: var(--font-body);
+  animation: fadeIn 1s ease-out;
+}
+
+.copyright a {
+  color: var(--accent-light);
+  text-decoration: none;
+  transition: color var(--transition-speed) ease;
+}
+
+.copyright a:hover {
+  color: var(--text-white);
+}
+
+/* Responsive Design Improvements */
+@media (max-width: 768px) {
+  .header,
+  .header1 {
+    font-size: 1.8em;
+    padding: 1rem 0.5rem;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .header1::after {
+    width: 60px;
+  }
+
+  .paragraph {
+    font-size: 1rem;
+    padding: 1rem;
+    margin: 1rem;
+    line-height: 1.6;
+  }
+
+  .social-container {
+    gap: 1rem;
+    padding: 0 1rem;
+  }
+
+  .followPage {
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    max-width: 100%;
+    flex-direction: column;
+    text-align: center;
+    margin: 1rem;
+  }
+
+  .followPage i {
+    font-size: 1.25rem;
+  }
+
+  .footer-content {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 1.5rem;
+  }
+
+  .footer-section h3::after {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .social-links {
+    justify-content: center;
+  }
+
+  .footer {
+    padding: 2rem 1rem;
+  }
+
+  .footer-section {
+    padding: 0 1rem;
+  }
+  
+  .homePage-container {
+    padding: 1rem;
+  }
+}
+
+/* Enhanced Accessibility Features */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .header1::after {
+    display: none;
+  }
+
+  .paragraph:hover,
+  .followPage:hover,
+  .footer-section a:hover {
+    transform: none;
+  }
+  
+  .followPage:active::after,
+  .social-container.loading::after {
+    animation: none;
+  }
+  
+  html {
+    scroll-behavior: auto;
+  }
+}
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  :root {
+    --primary: #004080;
+    --primary-dark: #002850;
+    --secondary: #d40000;
+    --secondary-light: #ff0000;
+    --accent: #006d6a;
+    --text-dark: #000000;
+    --text-light: #444444;
+    --text-white: #ffffff;
+    --card-bg: #ffffff;
+    --background: #f0f0f0;
+  }
+
+  .footer {
+    background: var(--primary-dark);
+  }
+
+  .header1 {
+    background: none;
+    color: var(--primary-dark);
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
+
+  .paragraph,
+  .followPage {
+    border: 2px solid var(--primary-dark);
+  }
+
+  .footer-section a {
+    text-decoration: underline;
+  }
+}
+
+/* Additional Touch Device Optimizations */
+@media (hover: none) {
+  .paragraph:hover,
+  .followPage:hover {
+    transform: none;
+    box-shadow: var(--shadow-md);
+  }
+
+  .footer-section a {
+    padding: 0.5rem 0;
+  }
+
+  .social-links a {
+    padding: 0.5rem;
+  }
+}
+
+/* Print Styles */
+@media print {
+  * {
+    background: transparent !important;
+    color: black !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  body {
+    padding: 1rem;
+  }
+
+  .header1 {
+    font-size: 24pt;
+    margin-bottom: 1cm;
+  }
+
+  .paragraph {
+    font-size: 12pt;
+    margin: 1cm 0;
+    padding: 0;
+    border: none;
+  }
+
+  .footer,
+  .followPage {
+    display: none !important;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+  }
+}
+
+/* Focus Styles for Accessibility */
+a:focus,
+button:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(32, 191, 107, 0.2);
+}
+
+/* Screen Reader Only Class */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Skip to Content Link */
+.skip-to-content {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--primary);
+  color: var(--text-white);
+  padding: 0.5rem 1rem;
+  z-index: 100;
+  transition: top var(--transition-speed) ease;
+  will-change: top;
+}
+
+.skip-to-content:focus {
+  top: 0;
+}
+
+/* Social Container Styling */
+.social-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 2rem auto;
+  align-items: center;
+  max-width: 600px;
+  animation: fadeIn 0.8s ease-out;
+}
+
+/* Loading state for social links */
+.social-container.loading {
+  min-height: 200px;
+  position: relative;
+}
+
+.social-container.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border: 3px solid rgba(74, 105, 189, 0.1);
+  border-radius: 50%;
+  border-top-color: var(--primary);
+  animation: spin 1s linear infinite;
+}
+/* Loading animation is defined at the top of the file */
+
+.followPage {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  color: var(--text-dark);
+  text-decoration: none;
+  transition: all var(--transition-speed) var(--transition-bounce);
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+  max-width: 300px;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  font-weight: 600;
+  font-size: 1.1rem;
+  isolation: isolate; /* Improves accessibility by creating stacking context */
+  will-change: transform, box-shadow;
+}
+
+/* Enhanced focus state for keyboard navigation */
+.followPage:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary), 0 0 0 6px rgba(74, 105, 189, 0.2);
+}
+
+/* Follow Page Hover States */
+.followPage:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+  color: var(--text-white);
+}
+
+/* Social Media Platform-specific colors */
+.followPage[aria-label*="Facebook"]:hover {
+  background: #1877f2;
+}
+
+.followPage[aria-label*="Twitter"]:hover {
+  background: #1da1f2;
+}
+
+.followPage[aria-label*="Instagram"]:hover {
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+}
+
+.followPage[aria-label*="Skype"]:hover {
+  background: #00aff0;
+}
+
+.followPage[aria-label*="GitHub"]:hover {
+  background: #333;
+}
+
+.followPage i {
+  font-size: 1.5rem;
+  transition: transform var(--transition-speed) var(--transition-bounce);
+  color: var(--secondary);
+  padding-right: 0.5em;
+  position: relative;
+  z-index: 2; /* Ensures icon is above pseudo-elements */
+  will-change: transform;
+}
+
+.followPage:hover i {
+  transform: scale(1.2);
+  color: var(--text-white);
+}
+
+/* Hover effect with sliding gradient */
+.followPage::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: var(--gradient-light);
+  transition: left 0.6s ease;
+  z-index: -1;
+  opacity: 0.3;
+}
+
+.followPage:hover::before {
+  left: 100%;
+}
+
+/* Enhanced touch feedback with ripple effect */
+.followPage:active::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--primary-light) 0%, transparent 70%);
+  opacity: 0.2;
+  animation: ripple 0.6s ease-out;
+  z-index: 1;
+}
+/* Ripple animation is defined at the top of the file */
+
+/* Section Spacing */
+.header, 
+.header1 {
+  margin-top: 2.5rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  padding-bottom: 0.5rem;
+}
+
+.header1::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 3px;
+  background: var(--gradient-accent);
+  border-radius: 2px;
+}
+
+.paragraph {
+  margin-bottom: 1.5rem;
+  animation: fadeIn 1s ease forwards;
+  animation-delay: calc(var(--index, 0) * 0.1s);
+}
+
+/* Note: Removed duplicate fadeIn keyframes as they're already defined at the top of the file */
+
+/* Note: Consolidated media queries - this section was merged with the one above */
+
+/* Consolidated Touch Device Optimizations */
+@media (hover: none) {
+  .paragraph:hover,
+  .followPage:hover {
+    transform: none;
+    box-shadow: var(--shadow-md);
+  }
+
+  .followPage:active {
+    transform: scale(0.98);
+    background: var(--primary-light);
+    color: var(--text-white);
+  }
+
+  .followPage::before {
+    display: none;
+  }
+
+  .followPage i {
+    transition: none;
+  }
+
+  .footer-section a,
+  .social-links a {
+    padding: 0.5rem 0;
+  }
+
+  /* Enhanced touch targets for better accessibility */
+  .followPage,
+  .footer-section a,
+  .social-links a,
+  .skip-to-content {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Immediate visual feedback for touch interactions */
+  .followPage:active i {
+    transform: scale(0.9);
+    transition: transform 0.1s ease;
+  }
+
+  /* Disable hover animations on touch devices */
+  .header1::after,
+  .footer-section a:hover,
+  .social-links a:hover {
+    animation: none;
+    transform: none;
+  }
+
+  /* Enhanced touch feedback */
+  .followPage {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Ensure proper touch behavior in high contrast mode */
+@media (hover: none) and (prefers-contrast: high) {
+  .followPage:active {
+    background-color: var(--primary-dark);
+    border: 2px solid var(--text-white);
+  }
+}
+
+/* Progressive Enhancement for Modern Browsers */
+@supports (backdrop-filter: blur(10px)) {
+  .footer {
+    backdrop-filter: blur(10px);
+    background: linear-gradient(
+      135deg,
+      rgba(74, 105, 189, 0.95),
+      rgba(30, 55, 153, 0.95)
+    );
   }
 }

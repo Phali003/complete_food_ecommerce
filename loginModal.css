@@ -1,0 +1,894 @@
+/* loginModal.css - Modern, responsive login modal styles */
+
+:root {
+  /* Main colors */
+  --primary-color: #4a90e2;
+  --primary-dark: #3a7bc8;
+  --primary-light: #6ba7e7;
+  --secondary-color: #e74c3c;
+  --text-color: #333333;
+  --text-light: #757575;
+  --border-color: #e0e0e0;
+  --success-color: #2ecc71;
+  --warning-color: #f39c12;
+  --error-color: #e74c3c;
+  --background-color: #ffffff;
+  --background-dark: #f5f5f5;
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* Animations */
+  --transition-speed: 0.3s;
+  --transition-function: ease;
+
+  /* Z-index layers */
+  /* Ensure modal z-index is higher than any other elements */
+  --z-modal-backdrop: 9000;
+  --z-modal: 9001;
+  --z-modal-close: 9002;
+
+  /* Login modal z-index */
+  --signin-modal-z-index: 9001;
+  --signup-modal-z-index: 9001;
+  --forgot-modal-z-index: 9001;
+}
+
+/* Styles start below */
+
+/* Button Gradient and Hover Effect */
+.btn-primary {
+  background: linear-gradient(
+    45deg,
+    var(--primary-color) 0%,
+    var(--primary-light) 100%
+  );
+  border: none;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.2);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(
+    45deg,
+    var(--primary-dark) 0%,
+    var(--primary-color) 100%
+  );
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.3);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Modal Header Gradient */
+.modal-header {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Smooth Input Focus Animation */
+@keyframes inputFocus {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Modal Open Animation Enhancement */
+/* Modal animation */
+@keyframes modalOpen {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* ===== Login Button in Navigation ===== */
+.login-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--transition-speed)
+    var(--transition-function);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.login-btn:hover {
+  background-color: var(--primary-dark);
+}
+
+.login-btn i {
+  font-size: 1rem;
+}
+
+/* ===== Modal Backdrop ===== */
+/* Modal Backdrop */
+/* Modal visibility */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: var(--z-modal-backdrop);
+  display: none;
+}
+
+.modal-backdrop.active {
+  display: block;
+}
+
+/* ===== Form Elements ===== */
+.form-group {
+  position: relative;
+  margin-bottom: 2px; /* Reduced from 10px */
+}
+
+.form-control {
+  width: 100%;
+  padding: 16px 16px 8px;
+  font-size: 1rem;
+  background: transparent;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  line-height: 1.2;
+}
+
+.login-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  background: var(--background-color);
+  border-radius: 8px;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+  z-index: var(--z-modal);
+  display: none;
+}
+
+.login-modal.active {
+  display: block;
+  animation: modalOpen 0.3s ease forwards;
+}
+
+/* Modal Header */
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px var(--spacing-lg); /* Reduced padding */
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+  font-size: 1.25rem; /* Reduced from 1.5rem */
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--text-light);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  line-height: 1;
+  transition: color var(--transition-speed) var(--transition-function);
+  z-index: var(--z-modal-close);
+}
+
+.modal-close:hover {
+  color: var(--text-color);
+}
+
+/* Tab Navigation */
+.modal-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 8px; /* Added to reduce space between tabs and form */
+}
+
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: var(--spacing-md);
+  font-size: 1rem;
+  cursor: pointer;
+  position: relative;
+  color: var(--text-light);
+  transition: color var(--transition-speed) var(--transition-function);
+}
+
+.tab-btn:after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: var(--primary-color);
+  transform: scaleX(0);
+  transition: transform var(--transition-speed) var(--transition-function);
+}
+
+.tab-btn.active {
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.tab-btn.active:after {
+  transform: scaleX(1);
+}
+
+/* Tab Content */
+.tab-content {
+  padding: 2px var(--spacing-lg) var(--spacing-lg);
+  max-height: 600px;
+}
+
+.tab-pane {
+  display: none;
+  animation: fadeIn var(--transition-speed) var(--transition-function);
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Form Elements */
+/* Form Elements */
+/* Form Elements with Enhanced Floating Labels */
+.form-group {
+  position: relative;
+  margin-bottom: 16px;
+  z-index: 0;
+}
+
+.form-control {
+  width: 100%;
+  height: 52px; /* Reduced height for better proportions */
+  padding: 16px; /* Single padding value for consistent spacing */
+  font-size: 16px;
+  background-color: var(--background-color);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  line-height: 1.2;
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure the background stays clean for autofill */
+.form-control:-webkit-autofill,
+.form-control:-webkit-autofill:hover,
+.form-control:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px var(--background-color) inset !important;
+  -webkit-text-fill-color: var(--text-color) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Hide the actual placeholder when label is present but keep it accessible */
+.form-control::placeholder {
+  color: transparent;
+}
+
+/* Base style for floating labels */
+.form-label {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  transform: translateY(-50%);
+  color: var(--text-light);
+  pointer-events: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-size: 16px;
+  z-index: 2;
+  transform-origin: left top;
+}
+
+/* Floating Label styles when input is focused or has content */
+.form-control:focus ~ .form-label,
+.form-control:not(:placeholder-shown) ~ .form-label {
+  top: 0;
+  transform: translateY(-50%) scale(0.85);
+  color: var(--primary-color);
+  font-weight: 500;
+  background-color: var(--background-color);
+  padding: 0 4px;
+}
+
+/* Adjust focus styles without duplicating padding */
+.form-control:focus,
+.form-control:not(:placeholder-shown) {
+  border-color: var(--primary-color);
+  outline: none;
+  padding-top: 24px; /* More space at top for label */
+  padding-bottom: 8px;
+}
+
+/* Password field specific adjustments */
+.form-group.password-field {
+  position: relative;
+}
+
+.form-group.password-field .form-control {
+  padding-right: 46px; /* Make room for the toggle button */
+}
+
+.form-group.password-field .form-control:focus,
+.form-group.password-field .form-control:not(:placeholder-shown) {
+  padding-right: 46px;
+  padding-top: 24px;
+  padding-bottom: 8px;
+}
+
+/* Add these new styles for better visual feedback */
+.form-control:hover:not(:focus):not(.error) {
+  border-color: var(--primary-light);
+}
+
+.form-control:focus {
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+/* Focus Effects */
+.form-control:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.1);
+  outline: none;
+}
+
+/* Removing conflicting input background animation */
+
+/* Remove duplicate styles */
+.form-control:hover {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.05);
+}
+.form-control.error {
+  border-color: var(--error-color);
+}
+
+.form-control.error ~ .form-label {
+  color: var(--error-color);
+}
+
+.form-error {
+  font-size: 0.8rem;
+  color: var(--error-color);
+  margin-top: var(--spacing-xs);
+  display: none;
+  position: absolute;
+  left: 16px;
+  bottom: -20px;
+}
+
+.form-error.visible {
+  display: block;
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-4px);
+  }
+  40%,
+  60% {
+    transform: translateX(4px);
+  }
+}
+
+/* Form Checkbox */
+.form-checkbox {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px; /* Reduced from 10px */
+}
+
+.form-checkbox input {
+  margin-right: var(--spacing-xs);
+}
+
+.form-checkbox label {
+  font-size: 0.9rem;
+  color: var(--text-light);
+}
+
+/* Password Toggle */
+.password-toggle {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-light);
+  font-size: 1rem;
+  padding: 4px;
+  z-index: 2;
+}
+
+/* Add specific styling for password field input */
+.form-group.password-field .form-control {
+  padding-right: 46px; /* Make room for the toggle button */
+}
+
+.password-toggle:hover {
+  color: var(--text-color);
+}
+
+/* Form actions - keep only flex layout */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: 4px 0; /* Reduced from 8px */
+}
+
+/* Forgot password link - minimal styles */
+.forgot-password {
+  /* Override any inherited styles */
+  display: inline-block;
+  color: #4a90e2;
+  font-size: 14px;
+  text-decoration: none;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0;
+}
+
+.forgot-password:hover {
+  /* Simple color change and underline on hover */
+  color: #3a7bc8;
+  text-decoration: underline;
+}
+
+/* Form Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 500;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition-speed) var(--transition-function);
+  border: none;
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+  width: 100%;
+  margin-top: 8px; /* Reduced from 12px */
+  position: relative;
+  z-index: 0;
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+}
+
+.btn-primary:disabled {
+  background-color: var(--border-color);
+  cursor: not-allowed;
+}
+
+/* Loading State */
+.btn-loading {
+  position: relative;
+  color: transparent !important;
+}
+
+.btn-loading:after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: calc(50% - 10px);
+  left: calc(50% - 10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Remove forgot-password from shared hover styles */
+.form-switch a:hover,
+.form-switch a:focus {
+  color: var(--primary-dark);
+  text-decoration: underline;
+  outline: none;
+}
+
+.form-switch a::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 1px;
+  bottom: 0;
+  left: 0;
+  background-color: var(--primary-dark);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.2s ease-out;
+}
+
+.form-switch a:hover::after,
+.form-switch a:focus::after {
+  transform: scaleX(1);
+}
+
+/* Alert Messages */
+.alert {
+  padding: var(--spacing-sm); /* Reduced from spacing-md */
+  border-radius: 4px;
+  margin-bottom: 0;
+  animation: fadeIn var(--transition-speed) var(--transition-function);
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 350px;
+  z-index: var(--z-modal);
+
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-color);
+  background-color: var(--background-color);
+  border: 1px solid transparent;
+  transition: all var(--transition-speed) var(--transition-function);
+}
+
+.alert.visible {
+  display: block;
+}
+
+.alert-success {
+  background-color: rgba(46, 204, 113, 0.1);
+  border: 1px solid var(--success-color);
+  color: var(--success-color);
+}
+
+.alert-error {
+  background-color: rgba(231, 76, 60, 0.1);
+  border: 1px solid var(--error-color);
+  color: var(--error-color);
+}
+
+/* Responsive Styles */
+@media (max-width: 576px) {
+  .login-modal {
+    width: 95%;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  
+  .form-control {
+    height: 52px; /* Slightly smaller on mobile */
+    font-size: 15px;
+  }
+  
+  .form-label {
+    font-size: 15px;
+  }
+  
+  .form-control:focus ~ .form-label,
+  .form-control:not(:placeholder-shown) ~ .form-label {
+    font-size: 13px;
+  }
+
+  .modal-header {
+    padding: var(--spacing-md);
+  }
+
+  .tab-content {
+    padding: var(--spacing-md);
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    align-items: flex-start;
+  }
+
+  .tab-btn {
+    padding: var(--spacing-sm);
+    font-size: 0.9rem;
+  }
+}
+
+/* Loading Indicator Animation */
+@keyframes loadingDots {
+  0%,
+  20% {
+    content: "";
+  }
+  40% {
+    content: ".";
+  }
+  60% {
+    content: "..";
+  }
+  80%,
+  100% {
+    content: "...";
+  }
+}
+
+.loading-text:after {
+  content: "";
+  animation: loadingDots 1.5s infinite;
+}
+
+/* Password Strength Indicator Styles */
+.password-strength {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-light);
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: all 0.3s ease-out;
+}
+
+/* Show strength indicator when password field is focused or has content */
+.form-control:focus ~ .password-strength,
+.form-control:not(:placeholder-shown) ~ .password-strength {
+  max-height: 200px; /* Adjust based on content */
+  opacity: 1;
+  margin-top: 8px;
+}
+
+/* Strength bar container */
+.strength-bar {
+  width: 100%;
+  height: 4px;
+  background-color: #e0e0e0;
+  border-radius: 2px;
+  margin: 8px 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Strength bar fill with gradient backgrounds */
+.strength-indicator {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+/* Strength levels with gradients */
+.password-strength.weak .strength-indicator {
+  width: 33.33%;
+  background: linear-gradient(to right, var(--error-color), #ff6b6b);
+}
+
+.password-strength.medium .strength-indicator {
+  width: 66.66%;
+  background: linear-gradient(to right, var(--warning-color), #ffd93d);
+}
+
+.password-strength.strong .strength-indicator {
+  width: 100%;
+  background: linear-gradient(to right, var(--success-color), #87ff87);
+}
+
+/* Strength text with icons */
+.strength-text {
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 0.3s ease;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.strength-text::before {
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 10px;
+}
+
+.password-strength.weak .strength-text {
+  color: var(--error-color);
+}
+
+.password-strength.weak .strength-text::before {
+  content: "\f057"; /* Times circle icon */
+}
+
+.password-strength.medium .strength-text {
+  color: var(--warning-color);
+}
+
+.password-strength.medium .strength-text::before {
+  content: "\f111"; /* Circle icon */
+}
+
+.password-strength.strong .strength-text {
+  color: var(--success-color);
+}
+
+.password-strength.strong .strength-text::before {
+  content: "\f058"; /* Check circle icon */
+}
+
+/* Requirements list */
+.strength-requirements {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.strength-requirements li {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.strength-requirements li::before {
+  content: "\f111"; /* Circle icon */
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  font-size: 8px;
+  margin-right: 8px;
+  transition: all 0.2s ease;
+}
+
+/* Requirement met state */
+.requirement.met {
+  color: var(--success-color);
+  opacity: 1;
+}
+
+.requirement.met::before {
+  content: "\f058"; /* Check circle icon */
+  color: var(--success-color);
+  animation: checkPop 0.3s ease-out;
+}
+
+/* Animation for requirement check */
+@keyframes checkPop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Success Animation */
+@keyframes checkmark {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.success-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.success-icon i {
+  font-size: 3rem;
+  color: var(--success-color);
+  animation: checkmark 0.5s ease-in-out forwards;
+}
+
+/* Tab panes */
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  height: 3px;
+  background-color: var(--primary-color);
+  transition: all var(--transition-speed) var(--transition-function);
+}
+
+/* Accessibility Focus Styles */
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* For users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

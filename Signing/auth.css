@@ -1,0 +1,340 @@
+/**
+ * auth.css - Additional styles for authentication components
+ * Complements the main loginModal.css file with specific authentication-focused enhancements
+ */
+
+/* Success message animation */
+@keyframes checkmarkAppear {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.success-icon i {
+  color: var(--success-color);
+  font-size: 3.5rem;
+  animation: checkmarkAppear 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+    forwards;
+}
+
+/* Enhanced form shake animation */
+@keyframes shakeForm {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-5px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+.shake {
+  animation: shakeForm 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* User greeting animation in success message */
+@keyframes slideUpFade {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.alert-success p {
+  animation: slideUpFade 0.5s ease-out forwards;
+  animation-delay: 0.2s;
+  opacity: 0;
+}
+
+.alert-success p:nth-child(2) {
+  animation-delay: 0.4s;
+}
+
+/* Style for toggling password visibility */
+.password-toggle:focus {
+  outline: none;
+  color: var(--primary-color);
+}
+
+.password-toggle i {
+  transition: all 0.2s ease;
+}
+
+.password-toggle:hover i {
+  transform: scale(1.1);
+}
+
+/* Improved button loading state */
+.btn-loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.btn-loading:after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: calc(50% - 10px);
+  left: calc(50% - 10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Enhanced alert styles */
+.alert {
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 0; /* Remove bottom margin */
+  display: flex;
+  align-items: flex-start;
+  visibility: hidden; /* Use visibility instead of display */
+  position: absolute; /* Position within modal container */
+  top: 10px; /* Position at top of modal with small margin */
+  left: 10px;
+  right: 10px;
+  opacity: 0;
+  transform: translateY(-20px); /* Slight upward offset when hidden */
+  transition: visibility 0s linear 0.3s,
+              opacity 0.3s ease,
+              transform 0.3s ease;
+  pointer-events: none; /* Prevent interaction when hidden */
+  z-index: 15; /* Above modal content */
+  background-color: white; /* Ensure alert has a background */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); /* Enhanced shadow for depth */
+}
+
+.alert.visible {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0s; /* Remove delay when showing */
+  pointer-events: auto; /* Re-enable interaction */
+  z-index: 15; /* Keep above modal content */
+}
+
+.alert-success {
+  background-color: rgba(46, 204, 113, 0.1);
+  border-left: 4px solid var(--success-color);
+  color: var(--success-color);
+  z-index: 11; /* Higher z-index for success messages */
+}
+
+.alert-error {
+  background-color: rgba(231, 76, 60, 0.1);
+  border-left: 4px solid var(--error-color);
+  color: var(--error-color);
+  z-index: 11; /* Higher z-index for error messages */
+}
+
+/* Custom styling for alerts with icons */
+.alert:before {
+  font-family: "Font Awesome 6 Free";
+  font-weight: 900;
+  margin-right: 10px;
+  font-size: 1rem;
+}
+
+.alert-success:before {
+  content: "\f00c"; /* Check mark icon */
+  color: var(--success-color);
+}
+
+.alert-error:before {
+  content: "\f071"; /* Warning icon */
+  color: var(--error-color);
+}
+
+/* Tab content container for proper positioning */
+.tab-content {
+  position: relative; /* Create positioning context for alerts */
+  min-height: 300px; /* Ensure enough space for content */
+  padding-top: 0; /* Remove space reserved for alerts */
+  margin-bottom: 20px;
+  overflow: visible; /* Allow alerts to overflow */
+}
+
+/* Animation for tab switching */
+.tab-pane {
+  visibility: hidden;
+  position: absolute;
+  width: 100%;
+  top: 0; /* Remove top offset */
+  left: 0;
+  right: 0;
+  opacity: 0;
+  transform: translateX(20px);
+  transition: visibility 0s linear 0.3s,
+              opacity 0.3s ease,
+              transform 0.3s ease;
+  z-index: 1;
+  padding-top: 0; /* Remove padding reserved for alerts */
+}
+
+.tab-pane.active {
+  visibility: visible;
+  position: relative;
+  opacity: 1;
+  transform: translateX(0);
+  transition-delay: 0s;
+  z-index: 5;
+}
+
+/* Prevent alert visibility during tab switches */
+.tab-pane:not(.active) .alert {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  transform: translateY(-20px) !important;
+  transition: none !important;
+  z-index: -10 !important; /* Ensure hidden alerts stay hidden */
+  pointer-events: none !important;
+}
+
+/* Ensure alerts in active tab have proper stacking */
+.tab-pane.active .alert {
+  z-index: 15;
+}
+
+/* Additional z-index boost for success/error alerts */
+.tab-pane.active .alert-success,
+.tab-pane.active .alert-error {
+  z-index: 16;
+}
+
+/* Add positioning context to modal container */
+.login-modal-content {
+  position: relative; /* Create positioning context for alerts */
+}
+
+/* Forgot password link animation */
+.forgot-password {
+  position: relative;
+  overflow: hidden;
+}
+
+.forgot-password:after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background-color: var(--primary-color);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+
+.forgot-password:hover:after {
+  transform: scaleX(1);
+}
+
+/* Login button in navigation animation */
+.login-btn {
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Improve focus states for accessibility */
+input:focus,
+button:focus,
+a:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(74, 105, 189, 0.4);
+}
+
+/* Custom styling for the password strength meter */
+.password-strength {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease-out;
+}
+
+#signupPassword:focus ~ .password-strength,
+#signupPassword:not(:placeholder-shown) ~ .password-strength {
+  max-height: 50px; /* Adjust as needed to accommodate content */
+}
+
+/* Smoother transitions on form inputs */
+.form-control {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Improved error message transitions */
+.error-message {
+  visibility: hidden;
+  opacity: 0;
+  height: 0;
+  margin: 0;
+  transition: visibility 0s linear 0.2s,
+              opacity 0.2s ease,
+              height 0.2s ease,
+              margin 0.2s ease;
+}
+
+.error-message.visible {
+  visibility: visible;
+  opacity: 1;
+  height: auto;
+  margin-top: 4px;
+  transition-delay: 0s;
+}
+
+/* Improve mobile responsiveness */
+@media (max-width: 576px) {
+  .form-control {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+  }
+
+  .login-modal {
+    max-width: 95%;
+  }
+
+  .modal-title {
+    font-size: 1.1rem;
+  }
+
+  .tab-btn {
+    font-size: 0.9rem;
+  }
+}

@@ -1,65 +1,737 @@
-document.addEventListener("DOMContentLoaded", function () {
-  let loggedIn = false;
-  let signinBtn = document.getElementById("submitSignIn");
+/**
+ * signIn.js - Handles user authentication and login form logic
+ */
 
-  signinBtn.addEventListener("click", function (event) {
-    event.preventDefault();
-
-    let signinUsername = document.getElementById("signInUsername").value;
-    let signinPassword = document.getElementById("signInPassword").value;
-
-    // Check if users exist in localStorage
-    let storedUsers = JSON.parse(localStorage.getItem("users")) || [];
-
-    if (storedUsers.length === 0) {
-      alert("User does not exist. Please sign up first.");
-      return; // Exit the function if no users exist
+document.addEventListener('DOMContentLoaded', () => {
+    // DOM Elements
+    const loginBtn = document.getElementById('loginBtn');
+    const authModal = document.getElementById('authModal');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    const passwordToggles = document.querySelectorAll('.password-toggle');
+    
+    // Form elements
+    const signinForm = document.getElementById('signinForm');
+    const signinEmail = document.getElementById('signinEmail');
+    const signinPassword = document.getElementById('signinPassword');
+    const signinButton = document.getElementById('signinButton');
+    const rememberMeCheckbox = document.getElementById('rememberMe');
+    const signinAlert = document.getElementById('signinAlert');
+    const signinEmailError = document.getElementById('signinEmailError');
+    const signinPasswordError = document.getElementById('signinPasswordError');
+    
+    // Forgot password form elements
+    const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+    const forgotPasswordEmail = document.getElementById('resetEmail');  // Updated to match HTML
+    const forgotPasswordButton = document.getElementById('resetPasswordButton');  // Updated to match HTML
+    const forgotPasswordAlert = document.getElementById('forgotPasswordAlert');
+    const forgotPasswordEmailError = document.getElementById('resetEmailError');  // Updated to match HTML
+    const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+    const switchToSignup = document.getElementById('switchToSignup');
+    const switchToSigninFromForgot = document.getElementById('switchToSigninFromForgot');
+    
+    // Initialize stored users from localStorage or create if it doesn't exist
+    if (!localStorage.getItem('users')) {
+        localStorage.setItem('users', JSON.stringify([]));
     }
 
-    // Validate username and password
-    if (validateUsername(signinUsername) && validatePassword(signinPassword)) {
-      // Check if the user exists in the stored users array
-      const user = storedUsers.find(
-        (user) =>
-          user.Username === signinUsername && user.Password === signinPassword,
-      );
-
-      if (user) {
-        alert(`Logged in successfully, ${signinUsername}`);
-        loggedIn = true;
-        // Clear the input fields after successful sign-in for security purposes and reducing confusion
-        document.getElementById("signUpUsername").value = "";
-        document.getElementById("signUpPassword").value = "";
-
-        // Redirect to another page
-        window.location.href = "index.html";
-      } else {
-        alert("Wrong username or password, try again!!");
-        loggedIn = false;
-      }
+    // Open modal when login button is clicked
+    if (loginBtn) {
+        loginBtn.addEventListener('click', () => {
+            openModal();
+        });
     }
-  });
 
-  function validateUsername(signinUsername) {
-    const check_signinUsername = /^[A-Z][a-zA-Z0-9]{5,}$/;
-    if (!check_signinUsername.test(signinUsername)) {
-      alert(
-        "Username must start with a capital letter and not be less than 5 characters",
-      );
-      return false;
+    // Close modal when close button is clicked
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', () => {
+            closeModal();
+        });
     }
-    return true;
-  }
 
-  function validatePassword(signinPassword) {
-    const check_signinPassword =
-      /^(?=.*[!@#$%^&*])(?=.*\d)(?=.*[A-Z])(?=.*[a-z]).{8,}$/;
-    if (!check_signinPassword.test(signinPassword)) {
-      alert(
-        "Password must be more than 8 characters, contain a capital letter, a small letter, and a special character",
-      );
-      return false;
+    // Close modal when clicking outside of it
+    if (modalBackdrop) {
+        modalBackdrop.addEventListener('click', (e) => {
+            if (e.target === modalBackdrop) {
+                closeModal();
+            }
+        });
     }
-    return true;
-  }
+
+    // Handle tab switching
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const tabName = button.getAttribute('data-tab');
+            showTab(tabName);
+        });
+    });
+
+    // Enhanced password toggle functionality
+    function handlePasswordToggle(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const toggle = e.currentTarget;
+        const targetId = toggle.getAttribute('data-target');
+        console.log('Toggle clicked for:', targetId);
+        
+        const passwordInput = document.getElementById(targetId);
+        if (!passwordInput) {
+            console.error('Password input not found:', targetId);
+            return;
+        }
+        
+        // Toggle password visibility
+        passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+        console.log('Changed input type to:', passwordInput.type);
+        
+        // Toggle icon
+        const icon = toggle.querySelector('i');
+        if (icon) {
+            if (passwordInput.type === 'text') {
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+    }
+    
+    function setupPasswordToggles() {
+        console.log('Setting up password toggles');
+        
+        // Get all password toggle buttons and log their data-target attributes
+        const passwordToggles = document.querySelectorAll('.password-toggle');
+        console.log('Found password toggles:', passwordToggles.length);
+        
+        passwordToggles.forEach(toggle => {
+            const targetId = toggle.getAttribute('data-target');
+            console.log('Found toggle with target:', targetId);
+            
+            const passwordInput = document.getElementById(targetId);
+            console.log('Found password input for ' + targetId + ':', passwordInput ? 'yes' : 'no');
+            
+            // First, remove any existing onclick property
+            toggle.onclick = null;
+            
+            // Then remove event listeners (needs to be a named function to remove)
+            toggle.removeEventListener('click', handlePasswordToggle);
+            
+            // Add new click handler
+            toggle.addEventListener('click', handlePasswordToggle);
+            console.log('Added click handler for toggle:', targetId);
+        });
+    }
+    
+    // Call the setup function initially
+    setupPasswordToggles();
+    
+    // Also set up password toggles when tabs are switched
+    tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            // Wait for the tab to be shown before setting up toggles
+            setTimeout(setupPasswordToggles, 100);
+        });
+    });
+
+    // Direct tab navigation links
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener('click', () => {
+            showTab('forgot-password');
+        });
+    }
+
+    if (switchToSignup) {
+        switchToSignup.addEventListener('click', (e) => {
+            e.preventDefault();
+            showTab('signup');
+        });
+    }
+
+    if (switchToSigninFromForgot) {
+        switchToSigninFromForgot.addEventListener('click', (e) => {
+            e.preventDefault();
+            showTab('signin');
+        });
+    }
+
+    // Form validation and submission
+    if (signinForm) {
+        signinForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            // Clear previous errors
+            clearErrorStates();
+            
+            // Validate form
+            let isValid = validateSignInForm();
+            
+            if (isValid) {
+                attemptLogin();
+            }
+        });
+    }
+
+    // Input validation on blur events
+    if (signinEmail) {
+        signinEmail.addEventListener('blur', () => {
+            validateSignInEmail();
+        });
+    }
+
+    if (signinPassword) {
+        signinPassword.addEventListener('blur', () => {
+            validateSignInPassword();
+        });
+    }
+
+    // Forgot password email validation on blur
+    if (forgotPasswordEmail) {
+        forgotPasswordEmail.addEventListener('blur', () => {
+            validateForgotPasswordEmail();
+        });
+    }
+
+    // Simple setup for forgot password functionality
+    if (forgotPasswordForm && forgotPasswordButton) {
+        console.log('Setting up forgot password button handler');
+        
+        // Remove form's submit handler completely
+        forgotPasswordForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            return false;
+        });
+        
+        // Set button type to "button"
+        forgotPasswordButton.setAttribute('type', 'button');
+        
+        // Add click handler using addEventListener
+        forgotPasswordButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Reset password button clicked');
+            
+            // Clear any previous error messages
+            clearForgotPasswordErrors();
+            
+            // Validate the email and proceed if valid
+            if (validateForgotPasswordEmail()) {
+                console.log('Email validation passed - processing reset');
+                handleForgotPassword();
+            } else {
+                console.log('Email validation failed - not proceeding');
+            }
+        });
+        
+        console.log('Forgot password handler set up successfully');
+    } else {
+        console.error('Could not find forgot password form or button');
+    }
+
+    /**
+     * Opens the authentication modal and sets default active tab
+     */
+    function openModal() {
+        authModal.classList.add('active');
+        modalBackdrop.classList.add('active');
+        document.documentElement.classList.add('modal-open');
+        console.log('Opening modal - added active class');
+        // Set focus to the first input field in the active tab
+        setTimeout(() => {
+            const activeTab = document.querySelector('.tab-pane.active');
+            const firstInput = activeTab.querySelector('input');
+            if (firstInput) firstInput.focus();
+        }, 300);
+    }
+
+    /**
+     * Closes the authentication modal
+     */
+    function closeModal() {
+        authModal.classList.remove('active');
+        modalBackdrop.classList.remove('active');
+        document.documentElement.classList.remove('modal-open');
+        console.log('Closing modal - removed active class');
+        clearAllAlerts();
+        signinForm.reset();
+    }
+
+    function showTab(tabName) {
+        // Store currently active tab
+        const previousTab = document.querySelector('.tab-pane.active');
+        const newTab = document.getElementById(tabName);
+        
+        if (!newTab) return;
+        
+        // First, hide any visible alerts in the current tab without transition
+        if (previousTab) {
+            const visibleAlerts = previousTab.querySelectorAll('.alert.visible');
+            visibleAlerts.forEach(alert => {
+                // Only hide error alerts, preserve success alerts
+                if (alert.classList.contains('alert-error')) {
+                    alert.style.transition = 'none';
+                    alert.classList.remove('visible');
+                    alert.offsetHeight; // Force reflow
+                }
+            });
+        }
+        
+        // Hide all tabs and remove active class from buttons
+        tabPanes.forEach(pane => {
+            pane.classList.remove('active');
+        });
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // Get the new tab button
+        const newTabBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+        
+        // Clear only error states, preserve success states
+        clearErrorStates();
+        
+        // Also clear forgot password error states
+        if (forgotPasswordAlert && forgotPasswordEmailError) {
+            clearForgotPasswordErrorStates();
+        }
+        
+        // Small delay to ensure alert transitions complete
+        setTimeout(() => {
+            // Restore transitions
+            document.querySelectorAll('.alert').forEach(alert => {
+                alert.style.transition = '';
+            });
+            
+            // Show new tab and set active class on button
+            newTab.classList.add('active');
+            if (newTabBtn) newTabBtn.classList.add('active');
+            
+            // Focus on first input after transition
+            setTimeout(() => {
+                const firstInput = newTab.querySelector('input');
+                if (firstInput) firstInput.focus();
+            }, 300); // Match the CSS transition duration
+        }, 50); // Small delay for transition coordination
+    }
+    /**
+     * Clears only error states in the sign-in form, preserving success alerts
+     */
+    function clearErrorStates() {
+        // Get currently active tab
+        const activeTab = document.querySelector('.tab-pane.active');
+        if (!activeTab) return;
+        
+        // First, set transition to none on all alerts to prevent flash
+        const alerts = activeTab.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            alert.style.transition = 'none';
+            alert.offsetHeight; // Force reflow
+        });
+        
+        // Clear error classes from inputs
+        signinEmail.classList.remove('error');
+        signinPassword.classList.remove('error');
+        
+        // Clear individual field error messages
+        signinEmailError.classList.remove('visible');
+        signinEmailError.textContent = '';
+        signinPasswordError.classList.remove('visible');
+        signinPasswordError.textContent = '';
+        
+        // Only clear the sign-in alert if it's showing an error
+        if (signinAlert.classList.contains('alert-error')) {
+            signinAlert.classList.remove('visible', 'alert-error');
+            signinAlert.textContent = '';
+        }
+        
+        // Restore transitions after a brief delay
+        setTimeout(() => {
+            alerts.forEach(alert => {
+                alert.style.transition = '';
+            });
+        }, 50);
+    }
+    function clearAllAlerts() {
+        // Clear all alert states
+        signinAlert.classList.remove('visible', 'alert-error', 'alert-success');
+        signinAlert.textContent = '';
+        
+        // Clear error states
+        signinEmail.classList.remove('error');
+        signinPassword.classList.remove('error');
+        signinEmailError.classList.remove('visible');
+        signinEmailError.textContent = '';
+        signinPasswordError.classList.remove('visible');
+        signinPasswordError.textContent = '';
+    }
+
+    /**
+     * Clears only error states in the forgot password form, preserving success alerts
+     */
+    function clearForgotPasswordErrorStates() {
+        if (forgotPasswordAlert && forgotPasswordAlert.classList.contains('alert-error')) {
+            // First set transition to none to prevent visibility transition from showing
+            forgotPasswordAlert.style.transition = 'none';
+            forgotPasswordAlert.offsetHeight; // Force reflow
+            
+            // Remove visible class
+            forgotPasswordAlert.classList.remove('visible', 'alert-error');
+            forgotPasswordAlert.textContent = '';
+            
+            // After a short delay, reset the transition property
+            setTimeout(() => {
+                forgotPasswordAlert.style.transition = '';
+            }, 50);
+        }
+        
+        if (forgotPasswordEmailError) {
+            forgotPasswordEmailError.classList.remove('visible');
+            forgotPasswordEmailError.textContent = '';
+            forgotPasswordEmail.classList.remove('error');
+        }
+    }
+    function clearForgotPasswordErrors() {
+        if (forgotPasswordAlert) {
+            forgotPasswordAlert.classList.remove('visible', 'alert-error', 'alert-success');
+            forgotPasswordAlert.textContent = '';
+        }
+        
+        if (forgotPasswordEmailError) {
+            forgotPasswordEmailError.classList.remove('visible');
+            forgotPasswordEmailError.textContent = '';
+            forgotPasswordEmail.classList.remove('error');
+        }
+    }
+    /**
+     * Validates the entire sign-in form
+     * @returns {boolean} True if the form is valid, false otherwise
+     */
+    function validateSignInForm() {
+        let isEmailValid = validateSignInEmail();
+        let isPasswordValid = validateSignInPassword();
+        
+        return isEmailValid && isPasswordValid;
+    }
+
+    /**
+     * Validates the email/username field
+     * @returns {boolean} True if valid, false otherwise
+     */
+    function validateSignInEmail() {
+        if (!signinEmail.value.trim()) {
+            signinEmailError.textContent = 'Email or username is required';
+            signinEmailError.classList.add('visible');
+            signinEmail.classList.add('error');
+            return false;
+        }
+        
+        signinEmailError.classList.remove('visible');
+        signinEmail.classList.remove('error');
+        return true;
+    }
+
+    /**
+     * Validates the password field
+     * @returns {boolean} True if valid, false otherwise
+     */
+    function validateSignInPassword() {
+        if (!signinPassword.value) {
+            signinPasswordError.textContent = 'Password is required';
+            signinPasswordError.classList.add('visible');
+            signinPassword.classList.add('error');
+            return false;
+        }
+        
+        signinPasswordError.classList.remove('visible');
+        signinPassword.classList.remove('error');
+        return true;
+    }
+
+    /**
+     * Validates the email in the forgot password form
+     * @returns {boolean} True if valid, false otherwise
+     */
+    function validateForgotPasswordEmail() {
+        if (!forgotPasswordEmail) {
+            console.error('Forgot password email element not found');
+            return false;
+        }
+        
+        if (!forgotPasswordEmailError) {
+            console.error('Forgot password email error element not found');
+            return false;
+        }
+        
+        const email = forgotPasswordEmail.value.trim();
+        console.log('Validating email:', email); // Debug log
+        
+        if (!email) {
+            forgotPasswordEmailError.textContent = 'Email is required';
+            forgotPasswordEmailError.classList.add('visible');
+            forgotPasswordEmail.classList.add('error');
+            return false;
+        }
+        
+        // Check email format using regex
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            forgotPasswordEmailError.textContent = 'Please enter a valid email address';
+            forgotPasswordEmailError.classList.add('visible');
+            forgotPasswordEmail.classList.add('error');
+            return false;
+        }
+        
+        forgotPasswordEmailError.classList.remove('visible');
+        forgotPasswordEmail.classList.remove('error');
+        return true;
+    }
+
+    /**
+     * Attempts to log in the user with the provided credentials
+     */
+    function attemptLogin() {
+        // Show loading state
+        signinButton.classList.add('btn-loading');
+        signinButton.disabled = true;
+        
+        // Simulate network request delay
+        setTimeout(() => {
+            const emailOrUsername = signinEmail.value.trim();
+            const password = signinPassword.value;
+            
+            // Retrieve users from localStorage
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            
+            // Find user by email or username
+            const user = users.find(user => 
+                (user.email === emailOrUsername || user.username === emailOrUsername) && 
+                user.password === password
+            );
+            
+            if (user) {
+                // Successful login
+                handleSuccessfulLogin(user);
+            } else {
+                // Failed login
+                handleFailedLogin();
+            }
+            
+            // Remove loading state
+            signinButton.classList.remove('btn-loading');
+            signinButton.disabled = false;
+        }, 1000);
+    }
+
+    /**
+     * Handles a successful login attempt
+     * @param {Object} user - The authenticated user object
+     */
+    function handleSuccessfulLogin(user) {
+        // Save session information if "Remember me" is checked
+        if (rememberMeCheckbox.checked) {
+            localStorage.setItem('currentUser', JSON.stringify({
+                username: user.username,
+                email: user.email,
+                isLoggedIn: true,
+                loginTime: new Date().toISOString()
+            }));
+        } else {
+            // Use sessionStorage for session-only login state
+            sessionStorage.setItem('currentUser', JSON.stringify({
+                username: user.username,
+                email: user.email,
+                isLoggedIn: true,
+                loginTime: new Date().toISOString()
+            }));
+        }
+        
+        // Show success message
+        signinAlert.textContent = `Welcome back, ${user.username}!`;
+        signinAlert.classList.remove('alert-error');
+        signinAlert.classList.add('alert-success', 'visible');
+        
+        // Close modal and refresh page after a short delay
+        setTimeout(() => {
+            closeModal();
+            updateUIForLoggedInUser(user);
+        }, 1500);
+    }
+
+    /**
+     * Handles a failed login attempt
+     */
+    function handleFailedLogin() {
+        // Clear any existing alerts before showing error
+        clearAllAlerts();
+        
+        // First set transition to none and hide alert
+        signinAlert.style.transition = 'none';
+        signinAlert.classList.remove('visible', 'alert-error', 'alert-success');
+        signinAlert.textContent = '';
+        signinAlert.offsetHeight; // Force reflow
+        
+        // Prepare the alert with error message and classes
+        signinAlert.textContent = 'Invalid email/username or password';
+        signinAlert.classList.add('alert-error');
+        
+        // Small delay before showing the alert to ensure proper transition
+        setTimeout(() => {
+            // Restore transition and show alert
+            signinAlert.style.transition = '';
+            signinAlert.classList.add('visible');
+            
+            // Shake the form to indicate error
+            signinForm.classList.add('shake');
+            setTimeout(() => {
+                signinForm.classList.remove('shake');
+            }, 500);
+        }, 10);
+    }
+
+    /**
+     * Updates the UI to reflect logged-in state
+     * @param {Object} user - The authenticated user object
+     */
+    function updateUIForLoggedInUser(user) {
+        // Change login button to show username
+        if (loginBtn) {
+            loginBtn.innerHTML = `<i class="fas fa-user"></i> ${user.username}`;
+            
+            // Change event listener to show user options instead of login modal
+            loginBtn.removeEventListener('click', openModal);
+            loginBtn.addEventListener('click', showUserOptions);
+        }
+    }
+
+    /**
+     * Shows user options dropdown (placeholder function)
+     */
+    function showUserOptions() {
+        // This would typically show a dropdown with options like "Profile", "Orders", "Logout", etc.
+        // For now, let's implement a simple logout functionality
+        if (confirm('Do you want to log out?')) {
+            localStorage.removeItem('currentUser');
+            sessionStorage.removeItem('currentUser');
+            location.reload();
+        }
+    }
+
+    /**
+     * Checks if user is already logged in and updates UI accordingly
+     */
+    function checkLoggedInStatus() {
+        const currentUser = JSON.parse(localStorage.getItem('currentUser')) || 
+                          JSON.parse(sessionStorage.getItem('currentUser'));
+        
+        if (currentUser && currentUser.isLoggedIn) {
+            updateUIForLoggedInUser(currentUser);
+        }
+    }
+    // Check if user is already logged in when page loads
+    checkLoggedInStatus();
+    
+    /**
+     * Handles the forgot password request
+     */
+    function handleForgotPassword() {
+        console.log('Handling forgot password request - processing email: ' + forgotPasswordEmail.value); // Debug log
+        
+        // Get the button directly to avoid any reference issues
+        const resetBtn = document.getElementById('resetPasswordButton');
+        
+        // Apply loading state to button
+        if (resetBtn) {
+            resetBtn.classList.add('btn-loading');
+            resetBtn.disabled = true;
+        }
+        
+        // Simulate network request delay
+        setTimeout(() => {
+            const email = forgotPasswordEmail.value.trim();
+            
+            // Retrieve users from localStorage
+            const users = JSON.parse(localStorage.getItem('users')) || [];
+            
+            // Check if email exists in user database
+            const userExists = users.some(user => user.email === email);
+            
+            if (userExists) {
+                // Generate a reset token
+                const resetToken = generateResetToken();
+                
+                // Store token in localStorage
+                storeResetToken(email, resetToken);
+                
+                // Create reset link (for demonstration)
+                const resetLink = `${window.location.origin}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+                
+                // Log reset link to console (in a real app, this would be sent via email)
+                console.log('Password Reset Link:', resetLink);
+                alert('For demonstration purposes, the reset link has been logged to the console.');
+                
+                // Show success message
+                forgotPasswordAlert.textContent = 'Password reset link has been sent to your email';
+                forgotPasswordAlert.classList.remove('alert-error');
+                forgotPasswordAlert.classList.add('alert-success', 'visible');
+                
+                // Clear the form after successful submission
+                forgotPasswordForm.reset();
+            } else {
+                // Email not found
+                forgotPasswordAlert.textContent = 'Email not found in our records';
+                forgotPasswordAlert.classList.remove('alert-success');
+                forgotPasswordAlert.classList.add('alert-error', 'visible');
+            }
+            
+            // Get the button directly and remove loading state
+            const resetBtn = document.getElementById('resetPasswordButton');
+            if (resetBtn) {
+                resetBtn.classList.remove('btn-loading');
+                resetBtn.disabled = false;
+            }
+        }, 1000);
+    }
+
+    /**
+     * Generates a secure random token for password reset
+     * @returns {string} A random token
+     */
+    function generateResetToken() {
+        // In a real application, use a more secure method to generate tokens
+        const tokenLength = 32;
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let token = '';
+        
+        for (let i = 0; i < tokenLength; i++) {
+            token += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        
+        return token;
+    }
+    
+    /**
+     * Stores the reset token in localStorage with expiration time
+     * @param {string} email - The user's email
+     * @param {string} token - The generated reset token
+     */
+    function storeResetToken(email, token) {
+        // Get existing tokens or initialize empty object
+        const resetTokens = JSON.parse(localStorage.getItem('resetTokens')) || {};
+        
+        // Set expiration time (15 minutes from now)
+        const expirationTime = new Date();
+        expirationTime.setMinutes(expirationTime.getMinutes() + 15);
+        
+        // Store token with email and expiration
+        resetTokens[token] = {
+            email: email,
+            expires: expirationTime.toISOString()
+        };
+        
+        // Save back to localStorage
+        localStorage.setItem('resetTokens', JSON.stringify(resetTokens));
+    }
 });
+
+
