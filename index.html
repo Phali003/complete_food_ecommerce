@@ -4,9 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Menu Icon</title>
-    <link rel="stylesheet" href="homePage.css" />
-    <link rel="stylesheet" href="loginModal.css" />
-    <link rel="stylesheet" href="Signing/auth.css" />
+    <!-- <link rel="stylesheet" href="css/all.min.css" /> -->
+    <link rel="stylesheet" href="/css/homePage.css" />
+    <link rel="stylesheet" href="/signing/auth.css" />
+    <link rel="stylesheet" href="css/loginModal.css" />
+    <link rel="stylesheet" href="confirmation/confirm.css" />
+    <link rel="stylesheet" href="checkOut/checkOut.css" />
+    <link rel="stylesheet" href="viewCart/viewCart.css" />
+    <link rel="stylesheet" href="src/components/Login.css" />
+    <link rel="stylesheet" href="signing/auth.css" />
+
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
@@ -224,7 +231,7 @@
     </div>
 
     <section class="logo">
-      <img src="Assets/myImages/Fork.jpg" class="headerImage" alt="Fork" />
+      <img src="/assets/myImages/Fork.jpg" class="headerImage" alt="Fork" />
       Fresh Eats Market Online
     </section>
 
@@ -283,15 +290,20 @@
             >Browse products</a
           >
         </li>
-        <li><a class="active" href="viewCart/viewCart.html">View Cart</a></li>
+
         <li>
-          <a class="active" href="checkOut/checkOut.html"
+          <a class="active" href="viewCart/viewCart.html">View Cart</a>
+        </li>
+        <li>
+          <a class="active" href="/checkout/checkOut.html"
             >Proceed to Check out</a
           >
         </li>
-        <li><a class="active" href="checkOut/checkOut.html">Place order</a></li>
         <li>
-          <a class="active" href="confirmation/confirm.html"
+          <a class="active" href="/checkout/checkOut.html">Place order</a>
+        </li>
+        <li>
+          <a class="active" href="/confirmation/confirm.html"
             >Order Confirmation</a
           >
         </li>
@@ -418,7 +430,7 @@
           data-rating="4.8"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_a-cocktail-with-a-touch-of-class.jpg"
+            src="/assets/myImages/jpeg-optimizer_a-cocktail-with-a-touch-of-class.jpg"
             alt="Premium Cocktail - Beverages - Fresh Herbs, Citrus Notes - Fresh Eats Market"
             loading="lazy"
           />
@@ -444,7 +456,7 @@
           data-keywords="cooked steak, wooden board, beef, medium steak"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_istockphoto-981092168-1024x1024.jpg"
+            src="/assets/myImages/jpeg-optimizer_istockphoto-981092168-1024x1024.jpg"
             alt="Cooked Steak"
           />
           <p class="image">
@@ -469,7 +481,7 @@
           data-keywords="breakfast tray, coffee, croissants, flowers, note, breakfast setup"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_a-romantic-tray-of-roses-and-breakfast.jpg"
+            src="/assets/myImages/jpeg-optimizer_a-romantic-tray-of-roses-and-breakfast.jpg"
             alt="Breakfast Tray with Coffee and Croissants"
           />
           <p class="image">
@@ -494,7 +506,7 @@
           data-keywords="breakfast plate, scrambled eggs, bacon, roasted potatoes, mushrooms, asparagus, tomato"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_bacon-and-eggs-breakfast.jpg"
+            src="/assets/myImages/jpeg-optimizer_bacon-and-eggs-breakfast.jpg"
             alt="Hearty Breakfast Plate"
           />
           <p class="image">
@@ -519,7 +531,7 @@
           data-keywords="bento box, fried chicken, rice, vegetables"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_bentoBoxMeal.jpg"
+            src="/assets/myImages/jpeg-optimizer_bentoBoxMeal.jpg"
             alt="Bento Box with Fried Chicken"
           />
           <p class="image">
@@ -544,7 +556,7 @@
           data-keywords="coffee, croissant, breakfast set, warm drink, buttery pastry"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_black-coffee-and-a-croissant.jpg"
+            src="/assets/myImages/jpeg-optimizer_black-coffee-and-a-croissant.jpg"
             alt="Cup of Coffee with Croissant"
           />
           <p class="image">
@@ -568,7 +580,7 @@
           data-keywords="basket of bread, rustic basket, freshly baked, assorted bread"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_brooke-lark-HjWzkqW1dgI-unsplash.jpg"
+            src="/assets/myImages/jpeg-optimizer_brooke-lark-HjWzkqW1dgI-unsplash.jpg"
             alt="Basket of Bread"
           />
           <p class="image">
@@ -592,7 +604,7 @@
           data-keywords="burger illustration, artistic, burger layers, ingredients"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_burgers-575655_1280.png"
+            src="/assets/myImages/jpeg-optimizer_burgers-575655_1280.png"
             alt="Two Burgers"
           />
           <p class="image">
@@ -617,7 +629,7 @@
           data-keywords="burger,burgers, fries, classic meal, crispy fries, burger plate"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_burgersAndFries.jpg"
+            src="/assets/myImages/jpeg-optimizer_burgersAndFries.jpg"
             alt="Burger and Fries"
           />
           <p class="image">
@@ -640,7 +652,7 @@
           class="cont"
           data-keywords="cake, decorated, dessert, special occasion"
         >
-          <img src="Assets/myImages/jpeg-optimizer_cake1.jpg" alt="Cake" />
+          <img src="/assets/myImages/jpeg-optimizer_cake1.jpg" alt="Cake" />
           <p class="image">
             <b><i>Cake:</i></b> A beautifully decorated cake, perfect for
             special occasions.<b><i>Price: $10.0</i></b
@@ -662,7 +674,7 @@
           data-keywords="strawberry, milkshake, whipped cream, fresh strawberry, beverage, dessert"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_foodiesfeed.com_strawberry-milk-splash.jpg"
+            src="/assets/myImages/jpeg-optimizer_foodiesfeed.com_strawberry-milk-splash.jpg"
             alt="Strawberry Milkshake"
           />
           <p class="image">
@@ -687,7 +699,7 @@
           data-keywords="assorted dishes, salads, fries, sauces, variety, food"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_foodPlatter.jpg"
+            src="/assets/myImages/jpeg-optimizer_foodPlatter.jpg"
             alt="Assorted Dishes"
           />
           <p class="image">
@@ -711,7 +723,7 @@
           data-keywords="French fries, crispy, golden, snack, side dish, potatoes"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_frenchFris.jpg"
+            src="/assets/myImages/jpeg-optimizer_frenchFris.jpg"
             alt="French Fries"
           />
           <p class="image">
@@ -735,7 +747,7 @@
           data-keywords="fried chicken, crispy, herbs, main course, poultry"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_fried-chicken-wings-pub-food.jpg"
+            src="/assets/myImages/jpeg-optimizer_fried-chicken-wings-pub-food.jpg"
             alt="Fried Chicken"
           />
           <p class="image">
@@ -758,7 +770,7 @@
           class="cont"
           data-keywords="milk, pouring, container, beverage, rustic, dairy"
         >
-          <img src="Assets/myImages/frenchFris.jpg" alt="Milk Pouring" />
+          <img src="/assets/myImages/frenchFris.jpg" alt="Milk Pouring" />
           <p class="image">
             <b><i>Milk Pouring:</i></b> Milk being poured into a container with
             a rustic background.<b><i>Price: $1.99</i></b
@@ -781,7 +793,7 @@
           data-keywords="fried chicken wings, crispy, green onions, appetizer, pub food"
         >
           <img
-            src="Assets/myImages/fried-chicken-wings-pub-food.jpg"
+            src="/assets/myImages/fried-chicken-wings-pub-food.jpg"
             alt="Fried Chicken Wings"
           />
           <p class="image">
@@ -805,7 +817,7 @@
           data-keywords="meatballs, fries, savory, meal, sauce, side dish"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_friedSnacks (1).jpg"
+            src="/assets/myImages/jpeg-optimizer_friedSnacks (1).jpg"
             alt="Meatballs with Fries"
           />
           <p class="image">
@@ -830,7 +842,7 @@
           data-keywords="French fries, crispy, golden, snack, side dish, potatoes"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_frenchFris.jpg"
+            src="/assets/myImages/jpeg-optimizer_frenchFris.jpg"
             alt="French Fries"
           />
           <p class="image">
@@ -854,7 +866,7 @@
           data-keywords="meatballs, fries, savory, meal, sauce, side dish"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_friedSnacks.jpg"
+            src="/assets/myImages/jpeg-optimizer_friedSnacks.jpg"
             alt="Meatballs with Fries"
           />
           <p class="image">
@@ -879,7 +891,7 @@
           class="cont"
           data-keywords="milk, pouring, container, beverage, rustic, dairy"
         >
-          <img src="Assets/myImages/frenchFris.jpg" alt="Milk Pouring" />
+          <img src="/assets/myImages/frenchFris.jpg" alt="Milk Pouring" />
           <p class="image">
             <b><i>Milk Pouring:</i></b> Milk being poured into a container with
             a rustic background.<b><i>Price: $1.99</i></b
@@ -901,7 +913,7 @@
           data-keywords="orange juice, glass, refreshing, frothy top, beverage, fruit juice"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_glass-32068_1280.png"
+            src="/assets/myImages/jpeg-optimizer_glass-32068_1280.png"
             alt="orange juice, glass, refreshing, frothy top, beverage, fruit juice"
           />
           <p class="image">
@@ -925,7 +937,7 @@
           data-keywords="grilled hot dogs, sausages, grill, cooked, barbecue, meal"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_grilledHotDogs.jpg"
+            src="/assets/myImages/jpeg-optimizer_grilledHotDogs.jpg"
             alt="grilled hot dogs, sausages, grill, cooked, barbecue, meal"
           />
           <p class="image">
@@ -949,7 +961,7 @@
           data-keywords="avocado, halved, fruit, pit, green background, healthy"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_half-of-an-avocado.jpg"
+            src="/assets/myImages/jpeg-optimizer_half-of-an-avocado.jpg"
             alt="avocado, halved, fruit, pit, green background, healthy"
           />
           <p class="image">
@@ -973,7 +985,7 @@
           data-keywords="gourmet burger, toppings, garnishes, citrus, main course, burger"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_hamburger-8597939_1280.png"
+            src="/assets/myImages/jpeg-optimizer_hamburger-8597939_1280.png"
             alt="gourmet burger, toppings, garnishes, citrus, main course, burger"
           />
           <p class="image">
@@ -997,7 +1009,7 @@
           data-keywords="ice cream, cone, scoop, dessert, cold, treat"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_hand-holds-up-a-two-scoop-ice-cream-cone.jpg"
+            src="/assets/myImages/jpeg-optimizer_hand-holds-up-a-two-scoop-ice-cream-cone.jpg"
             alt="ice cream, cone, scoop, dessert, cold, treat"
           />
           <p class="image">
@@ -1021,7 +1033,7 @@
           data-keywords="fruit juice, vegetable juice, glass, healthy, beverage, fresh"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_healthy-beet-juice.jpg"
+            src="/assets/myImages/jpeg-optimizer_healthy-beet-juice.jpg"
             alt="fruit juice, vegetable juice, glass, healthy, beverage, fresh"
           />
           <p class="image">
@@ -1045,7 +1057,7 @@
           data-keywords="hot dogs,hot dog, toppings, meal, classic, variety, snack"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_hotDog1.jpg"
+            src="/assets/myImages/jpeg-optimizer_hotDog1.jpg"
             alt="hot dogs,hot dog, toppings, meal, classic, variety, snack"
           />
           <p class="image">
@@ -1069,7 +1081,7 @@
           data-keywords="hot dogs, fries, meal, condiments, fruit, classic"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_hotDogsFries.jpg"
+            src="/assets/myImages/jpeg-optimizer_hotDogsFries.jpg"
             alt="hot dogs, fries, meal, condiments, fruit, classic"
           />
           <p class="image">
@@ -1093,7 +1105,7 @@
           data-keywords="wood-fired pizza, baked, oven, pizza, classic, meal"
         >
           <img
-            src="Assets/myImages/pix4.jpg"
+            src="/assets/myImages/pix4.jpg"
             alt="wood-fired pizza, baked, oven, pizza, classic, meal"
           />
           <p class="image">
@@ -1116,7 +1128,7 @@
           data-keywords="chocolate,chcolate cake, slice, glaze, rich, dessert, green leaves"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_istockphoto-1370520449-1024x1024.jpg"
+            src="/assets/myImages/jpeg-optimizer_istockphoto-1370520449-1024x1024.jpg"
             alt="chocolate,chcolate cake, slice, glaze, rich, dessert, green leaves"
           />
           <p class="image">
@@ -1140,7 +1152,7 @@
           data-keywords="latte art, coffees, heart-shaped foam, coffee cups, circle arrangement"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_istockphoto-1400194993-1024x1024.jpg"
+            src="/assets/myImages/jpeg-optimizer_istockphoto-1400194993-1024x1024.jpg"
             alt="latte art, coffees, heart-shaped foam, coffee cups, circle arrangement"
           />
           <p class="image">
@@ -1165,7 +1177,7 @@
           data-keywords="fried chicken, crispy, herbs, main course, poultry"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_fried-chicken-wings-pub-food.jpg"
+            src="/assets/myImages/jpeg-optimizer_fried-chicken-wings-pub-food.jpg"
             alt="Fried Chicken"
           />
           <p class="image">
@@ -1189,7 +1201,7 @@
           data-keywords="Margherita pizza, cheese, tomatoes, basil leaves, small bowls, sauce, scattered spices"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_istockphoto-1425087192-1024x1024.jpg"
+            src="/assets/myImages/jpeg-optimizer_istockphoto-1425087192-1024x1024.jpg"
             alt="Margherita pizza, cheese, tomatoes, basil leaves, small bowls, sauce, scattered spices"
           />
           <p class="image">
@@ -1213,7 +1225,7 @@
           data-keywords="red wine, pour, glass, bottle, beverage, drink"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_pix3 (1).jpg"
+            src="/assets/myImages/jpeg-optimizer_pix3 (1).jpg"
             alt="red wine, pour, glass, bottle, beverage, drink"
           />
           <p class="image">
@@ -1237,7 +1249,7 @@
           data-keywords="cake, vibrant, blue icing, sprinkles, toppings, dessert"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_istockphoto-1472849554-1024x1024.jpg"
+            src="/assets/myImages/jpeg-optimizer_istockphoto-1472849554-1024x1024.jpg"
             alt="cake, vibrant, blue icing, sprinkles, toppings, dessert"
           />
           <p class="image">
@@ -1261,7 +1273,7 @@
           data-keywords="berry toast, red fruit sauce, toast, berries, breakfast, snack"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_istockphoto-1509698749-1024x1024.jpg"
+            src="/assets/myImages/jpeg-optimizer_istockphoto-1509698749-1024x1024.jpg"
             alt="berry toast, red fruit sauce, toast, berries, breakfast, snack"
           />
           <p class="image">
@@ -1285,7 +1297,7 @@
           data-keywords="buffalo wings, carrot sticks, celery sticks, ranch dressing, appetizer, snack"
         >
           <img
-            src="Assets/myImages/jpeg-optimizer_istockphoto-1509702696-1024x1024.jpg"
+          src="/assets/myImages/jpeg-optimizer_istockphoto-1400194993-1024x1024.jpg"
             alt="buffalo wings, carrot sticks, celery sticks, ranch dressing, appetizer, snack"
           />
           <p class="image">
@@ -1448,12 +1460,15 @@
     </section>
 
     <!-- ===== Core Scripts ===== -->
-    <script src="animations.js" defer></script>
-    <script src="homePage.js" defer></script>
+    <script src="/viewCart/js/homePage.js" defer></script>
+    <script src="models/CartModel.js" defer></script>
+    <script src="models/CartModel.js"></script>
+    <script src="models/ProductModel.js"></script>
+    <script src="models/UserModel.js"></script>
+    <script src="js/animations.js" defer></script>
     <script src="modal.js" defer></script>
     <script src="Signing/signIn.js" defer></script>
     <script src="Signing/signUp.js" defer></script>
-
     <!-- Modal and Tab Functionality Script -->
     <script>
       // Simple Modal and Tab Functionality

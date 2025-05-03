@@ -132,23 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
         signupSuccessAlert.classList.remove('visible');
         
         // Clear error states
-        usernameError.classList.remove('visible');
-        usernameError.textContent = '';
-        
-        emailError.classList.remove('visible');
-        emailError.textContent = '';
-        
-        passwordError.classList.remove('visible');
-        passwordError.textContent = '';
-        
-        confirmPasswordError.classList.remove('visible');
-        confirmPasswordError.textContent = '';
-        
-        // Remove error class from inputs
-        signupUsername.classList.remove('error');
-        signupEmail.classList.remove('error');
-        signupPassword.classList.remove('error');
-        confirmPassword.classList.remove('error');
+        clearErrorStates();
     }
     
     /**
@@ -211,14 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
         
-        // Check if username already exists
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        if (users.some(user => user.username === username)) {
-            usernameError.textContent = 'Username is already taken';
-            usernameError.classList.add('visible');
-            signupUsername.classList.add('error');
-            return false;
-        }
+        // Note: We can't check if the username already exists in real-time
+        // The API will handle this check during registration
         
         usernameError.classList.remove('visible');
         signupUsername.classList.remove('error');
@@ -247,20 +225,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return false;
         }
         
-        // Check if email already exists
-        const users = JSON.parse(localStorage.getItem('users')) || [];
-        if (users.some(user => user.email === email)) {
-            emailError.textContent = 'Email is already registered';
-            emailError.classList.add('visible');
-            signupEmail.classList.add('error');
-            return false;
-        }
+        // Note: We can't check if the email already exists in real-time
+        // The API will handle this check during registration
         
+        emailError.classList.remove('visible');
         emailError.classList.remove('visible');
         signupEmail.classList.remove('error');
         return true;
     }
-
     /**
      * Validates the password field
      * @returns {boolean} True if valid, false otherwise
@@ -369,43 +341,96 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Registers a new user with the provided information
+     * Registers a new user with the provided information using the API
      */
     function registerUser() {
         // Show loading state
         signupButton.classList.add('btn-loading');
         signupButton.disabled = true;
         
-        // Simulate network request delay
-        setTimeout(() => {
-            const username = signupUsername.value.trim();
-            const email = signupEmail.value.trim();
-            const password = signupPassword.value;
-            
-            // Create new user object
-            const newUser = {
-                username,
-                email,
-                password,
-                createdAt: new Date().toISOString()
-            };
-            
-            // Retrieve existing users from localStorage
-            const users = JSON.parse(localStorage.getItem('users')) || [];
-            
-            // Add new user
-            users.push(newUser);
-            
-            // Save back to localStorage
-            localStorage.setItem('users', JSON.stringify(users));
-            
-            // Show success message
-            handleSuccessfulRegistration(newUser);
+        const username = signupUsername.value.trim();
+        const email = signupEmail.value.trim();
+        const password = signupPassword.value;
+        const confirm_password = confirmPassword.value;
+        
+        // Create request data object
+        const userData = {
+            username,
+            email,
+            password,
+            confirm_password
+        };
+        
+        // API endpoint URL
+        const apiUrl = 'http://localhost:3000/api/auth/signup';
+        
+        // Make the API call
+        fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(userData)
+        })
+        .then(response => {
+            // Check if the response is JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json().then(data => {
+                    // Return both the response status and data together
+                    return { status: response.status, data };
+                });
+            } else {
+                // If not JSON, return text
+                return response.text().then(text => {
+                    return { status: response.status, data: { message: text } };
+                });
+            }
+        })
+        .then(result => {
+            const { status, data } = result;
             
             // Remove loading state
             signupButton.classList.remove('btn-loading');
             signupButton.disabled = false;
-        }, 1000);
+            
+            // Handle response based on status code
+            if (status >= 200 && status < 300) {
+                // Success
+                console.log('Registration successful:', data);
+                
+                // Create user object for local handling
+                const newUser = {
+                    username,
+                    email,
+                    userId: data.userId || 'unknown'
+                };
+                
+                // Show success message
+                handleSuccessfulRegistration(newUser);
+            } else {
+                // Handle error response
+                let errorMessage = data.message || 'Registration failed';
+                
+                // Display the error
+                signupAlert.textContent = errorMessage;
+                signupAlert.classList.add('visible', 'alert-error');
+                console.error('Registration error:', data);
+            }
+        })
+        .catch(error => {
+            // Network or parsing error
+            console.error('Network or parsing error:', error);
+            
+            // Remove loading state
+            signupButton.classList.remove('btn-loading');
+            signupButton.disabled = false;
+            
+            // Display generic error message
+            signupAlert.textContent = 'Network error. Please try again later.';
+            signupAlert.classList.add('visible', 'alert-error');
+        });
     }
 
     /**

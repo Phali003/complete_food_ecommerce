@@ -24,7 +24,7 @@
     <!-- Header -->
     <header class="site-header" role="banner">
       <div class="logo-container">
-        <a href="../index.html" class="back-link">
+        <a href="/index.html" class="back-link">
           <span class="logo-text"
             ><i class="fas fa-utensils logo-icon"></i>Food<span
               class="logo-accent"
@@ -35,28 +35,11 @@
       </div>
     </header>
 
-    <!-- Processing overlay for transitions -->
-    <div class="processing-overlay">
-      <div class="processing-spinner"></div>
-      <div class="processing-message">Processing your order...</div>
-    </div>
-
-    <!-- Main content -->
-    <main id="main-content" class="containerCheckOut">
-      <!-- Progress indicator -->
-      <nav
-        class="checkout-progress"
-        aria-label="Checkout progress"
-        role="navigation"
-      >
-        <a
-          href="../viewCart/viewCart.html"
-          class="progress-step completed"
-          aria-label="Go to cart page"
-          title="View cart"
-        >
-          <div class="step-icon" aria-hidden="true">1</div>
-          <span class="step-label">Cart</span>
+    <!-- Progress indicator -->
+    <nav class="checkout-progress" aria-label="Checkout progress" role="navigation">
+        <a href="/viewCart/viewCart.html" class="progress-step completed" aria-label="Go to cart page" title="View cart">
+            <div class="step-icon" aria-hidden="true">1</div>
+            <span class="step-label">Cart</span>
         </a>
         <a
           href="checkOut.html"
@@ -129,15 +112,20 @@
             <input
               required
               type="text"
-              name="username"
+              name="fullname"
               class="input"
               id="signInUsername"
               placeholder=" "
               aria-required="true"
+              aria-label="Enter your full name (first and last name)"
+              autocomplete="name"
+              minlength="5"
+              pattern="[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'-]*[A-Za-zÀ-ÿ]"
+              title="Please enter your full name (first and last name)"
             />
             <label class="label" for="signInUsername">Full Name</label>
             <div class="error-message" id="username-error">
-              Please enter your full name
+              Please enter your first and last name
             </div>
           </div>
 
@@ -231,6 +219,7 @@
           class="payment-methods"
           role="radiogroup"
           aria-labelledby="payment-method-heading"
+          style="position: relative;"
         >
           <h3 id="payment-method-heading" class="visually-hidden">
             Select Payment Method
@@ -241,6 +230,7 @@
             tabindex="0"
             role="radio"
             aria-checked="true"
+            data-payment-method="credit-card"
           >
             <i
               class="fa-solid fa-credit-card payment-method-icon"
@@ -254,6 +244,7 @@
             tabindex="0"
             role="radio"
             aria-checked="false"
+            data-payment-method="paypal"
           >
             <i
               class="fa-brands fa-paypal payment-method-icon"
@@ -267,6 +258,7 @@
             tabindex="0"
             role="radio"
             aria-checked="false"
+            data-payment-method="cash"
           >
             <i
               class="fa-solid fa-money-bill-wave payment-method-icon"
@@ -280,6 +272,7 @@
             tabindex="0"
             role="radio"
             aria-checked="false"
+            data-payment-method="bank-transfer"
           >
             <i
               class="fa-solid fa-building-columns payment-method-icon"
@@ -315,12 +308,15 @@
               <input
                 type="text"
                 class="numberInput"
-                placeholder="Card Number"
+                placeholder="XXXX XXXX XXXX XXXX"
                 id="numberInput"
                 required
                 pattern="[0-9\s]{13,19}"
                 maxlength="19"
                 aria-required="true"
+                inputmode="numeric"
+                aria-label="Card number - enter 16 digits"
+                autocomplete="cc-number"
               />
             </div>
             <div class="error-message" id="card-number-error">
@@ -447,15 +443,6 @@
         </div>
         <div class="footer-section">
           <h3>Contact Us</h3>
-          <p>Email: support@fooddelivery.com</p>
-          <p>Phone: (123) 456-7890</p>
-        </div>
-        <div class="footer-section">
-          <h3>Follow Us</h3>
-          <div class="social-icons">
-            <a href="#" aria-label="Facebook"
-              ><i class="fab fa-facebook-f" aria-hidden="true"></i
-            ></a>
             <a href="#" aria-label="Twitter"
               ><i class="fab fa-twitter" aria-hidden="true"></i
             ></a>

@@ -32,10 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const switchToSignup = document.getElementById('switchToSignup');
     const switchToSigninFromForgot = document.getElementById('switchToSigninFromForgot');
     
-    // Initialize stored users from localStorage or create if it doesn't exist
-    if (!localStorage.getItem('users')) {
-        localStorage.setItem('users', JSON.stringify([]));
-    }
+    // API endpoint constants
+    const API_BASE_URL = '/api/auth';
+    const LOGIN_ENDPOINT = `${API_BASE_URL}/login`;
+    const LOGOUT_ENDPOINT = `${API_BASE_URL}/logout`;
 
     // Open modal when login button is clicked
     if (loginBtn) {
@@ -495,55 +495,97 @@ document.addEventListener('DOMContentLoaded', () => {
         signinButton.classList.add('btn-loading');
         signinButton.disabled = true;
         
-        // Simulate network request delay
-        setTimeout(() => {
-            const emailOrUsername = signinEmail.value.trim();
-            const password = signinPassword.value;
+        const emailOrUsername = signinEmail.value.trim();
+        const password = signinPassword.value;
+        
+        // Determine if input is email or username based on format
+        const isEmail = emailOrUsername.includes('@');
+        
+        // Create request payload
+        const loginData = {
+            password: password
+        };
+        
+        // Add either email or username field depending on what was entered
+        if (isEmail) {
+            loginData.email = emailOrUsername;
+        } else {
+            loginData.username = emailOrUsername;
+        }
+        
+        // Make API request to login
+        fetch(LOGIN_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(loginData),
+            credentials: 'same-origin' // Send cookies with the request
+        })
+        .then(response => {
+            // Check if the response is JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json().then(data => {
+                    // Return both the response status and data together
+                    return { status: response.status, data };
+                });
+            } else {
+                // If not JSON, return text
+                return response.text().then(text => {
+                    return { status: response.status, data: { message: text } };
+                });
+            }
+        })
+        .then(result => {
+            const { status, data } = result;
             
-            // Retrieve users from localStorage
-            const users = JSON.parse(localStorage.getItem('users')) || [];
+            // Add debug logging
+            console.log('Login response:', { status, data });
             
-            // Find user by email or username
-            const user = users.find(user => 
-                (user.email === emailOrUsername || user.username === emailOrUsername) && 
-                user.password === password
-            );
-            
-            if (user) {
-                // Successful login
-                handleSuccessfulLogin(user);
+            // Handle response based on status code
+            if (status >= 200 && status < 300 && data.success) {
+                // Successful login - note that user and token are directly in data object
+                handleSuccessfulLogin(data.user, data.token);
             } else {
                 // Failed login
-                handleFailedLogin();
+                handleFailedLogin(data.message || 'Invalid email/username or password');
             }
-            
+        })
+        .catch(error => {
+            console.error('Login error:', error);
+            handleFailedLogin('Network error. Please try again later.');
+        })
+        .finally(() => {
             // Remove loading state
             signinButton.classList.remove('btn-loading');
             signinButton.disabled = false;
-        }, 1000);
+        });
     }
 
     /**
      * Handles a successful login attempt
      * @param {Object} user - The authenticated user object
+     * @param {string} token - The authentication token from the server
      */
-    function handleSuccessfulLogin(user) {
+    function handleSuccessfulLogin(user, token) {
         // Save session information if "Remember me" is checked
+        const userData = {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role,
+            token: token,
+            isLoggedIn: true,
+            loginTime: new Date().toISOString()
+        };
+        
         if (rememberMeCheckbox.checked) {
-            localStorage.setItem('currentUser', JSON.stringify({
-                username: user.username,
-                email: user.email,
-                isLoggedIn: true,
-                loginTime: new Date().toISOString()
-            }));
+            localStorage.setItem('currentUser', JSON.stringify(userData));
         } else {
             // Use sessionStorage for session-only login state
-            sessionStorage.setItem('currentUser', JSON.stringify({
-                username: user.username,
-                email: user.email,
-                isLoggedIn: true,
-                loginTime: new Date().toISOString()
-            }));
+            sessionStorage.setItem('currentUser', JSON.stringify(userData));
         }
         
         // Show success message
@@ -560,8 +602,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Handles a failed login attempt
+     * @param {string} errorMessage - Optional custom error message
      */
-    function handleFailedLogin() {
+    function handleFailedLogin(errorMessage = 'Invalid email/username or password') {
         // Clear any existing alerts before showing error
         clearAllAlerts();
         
@@ -572,7 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
         signinAlert.offsetHeight; // Force reflow
         
         // Prepare the alert with error message and classes
-        signinAlert.textContent = 'Invalid email/username or password';
+        signinAlert.textContent = errorMessage;
         signinAlert.classList.add('alert-error');
         
         // Small delay before showing the alert to ensure proper transition
@@ -586,6 +629,17 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 signinForm.classList.remove('shake');
             }, 500);
+
+            // Hide the error message after 3 seconds
+            setTimeout(() => {
+                signinAlert.style.transition = 'opacity 0.3s ease-out';
+                signinAlert.classList.remove('visible');
+                // Clear the message after fade out
+                setTimeout(() => {
+                    signinAlert.textContent = '';
+                    signinAlert.classList.remove('alert-error');
+                }, 300);
+            }, 3000);
         }, 10);
     }
 
@@ -605,18 +659,47 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+    /**
      * Shows user options dropdown (placeholder function)
      */
     function showUserOptions() {
         // This would typically show a dropdown with options like "Profile", "Orders", "Logout", etc.
         // For now, let's implement a simple logout functionality
         if (confirm('Do you want to log out?')) {
-            localStorage.removeItem('currentUser');
-            sessionStorage.removeItem('currentUser');
-            location.reload();
+            // Get current user data to get token
+            const currentUser = JSON.parse(localStorage.getItem('currentUser')) || 
+                              JSON.parse(sessionStorage.getItem('currentUser'));
+            
+            // Call logout API if we have token
+            if (currentUser && currentUser.token) {
+                fetch(LOGOUT_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentUser.token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    console.log('Logout response:', response.status);
+                })
+                .catch(error => {
+                    console.error('Logout error:', error);
+                })
+                .finally(() => {
+                    // Clear storage and reload regardless of API response
+                    localStorage.removeItem('currentUser');
+                    sessionStorage.removeItem('currentUser');
+                    location.reload();
+                });
+            } else {
+                // If no token found, just clear storage and reload
+                localStorage.removeItem('currentUser');
+                sessionStorage.removeItem('currentUser');
+                location.reload();
+            }
         }
     }
-
     /**
      * Checks if user is already logged in and updates UI accordingly
      */

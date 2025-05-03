@@ -1,33 +1,37 @@
-function generateOrderNumber() {
-  // Get the current timestamp
-  const timeStamp = Date.now();
-  // Generate a random number
-  const randomNumber = Math.floor(Math.random() * 1000000);
-  // Combine both timestamp and random number to generate order number
-  const orderNumber = `ORD-${timeStamp}-${randomNumber}`;
-  return orderNumber;
-}
+document.addEventListener("DOMContentLoaded", function() {
+    // Print functionality
+    const printButton = document.querySelector('.print-order');
+    if (printButton) {
+        printButton.addEventListener('click', function() {
+            window.print();
+        });
+    }
 
-function getOrderDate() {
-  // Get the current date
-  const today = new Date();
-  return today.toDateString();
-}
+    // Generate order number
+    function generateOrderNumber() {
+        const timeStamp = Date.now();
+        const randomNumber = Math.floor(Math.random() * 1000000);
+        return `ORD-${timeStamp}-${randomNumber}`;
+    }
 
-function getOrderAddress() {
-  // Retrieve address values stored in localStorage
-  const userDetails = JSON.parse(localStorage.getItem("userDetails"));
-  return userDetails ? userDetails.address : "No address provided";
-}
+    // Get order date
+    function getOrderDate() {
+        const today = new Date();
+        return today.toDateString();
+    }
 
-// Display the generated order number when the page loads
-document.addEventListener("DOMContentLoaded", function () {
-  const orderNumberElement = document.getElementById("orderNumber");
-  orderNumberElement.textContent = generateOrderNumber();
+    // Get order address
+    function getOrderAddress() {
+        const userDetails = JSON.parse(localStorage.getItem("userDetails"));
+        return userDetails ? userDetails.address : "No address provided";
+    }
 
-  const orderDateElement = document.getElementById("orderDate");
-  orderDateElement.textContent = getOrderDate();
+    // Update order details
+    const orderNumberElement = document.getElementById("order-number");
+    const orderDateElement = document.getElementById("order-date");
+    const orderAddressElement = document.getElementById("delivery-address");
 
-  const orderAddressElement = document.getElementById("orderAddress");
-  orderAddressElement.textContent = getOrderAddress();
+    if (orderNumberElement) orderNumberElement.textContent = generateOrderNumber();
+    if (orderDateElement) orderDateElement.textContent = getOrderDate();
+    if (orderAddressElement) orderAddressElement.textContent = getOrderAddress();
 });

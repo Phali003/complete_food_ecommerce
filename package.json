@@ -1,16 +1,25 @@
 {
-  "name": "e-commerce",
+  "name": "food-ecommerce",
   "version": "1.0.0",
-  "description": "Fresh Eats Market Online is a dynamic e-commerce platform dedicated to bringing the freshest and highest quality groceries directly to your doorstep. Our mission is to make healthy eating accessible and convenient by offering a wide variety of farm-fresh produce, organic products, and artisanal goods.",
-  "main": "browseProduct.js",
+  "description": "Fresh Eats Market Online is a dynamic e-commerce platform dedicated to bringing the freshest and highest quality groceries directly to your doorstep.",
+  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "check-db": "node scripts/checkDatabase.js",
+    "setup-db": "node scripts/setup-db.js"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Phali003/Food-Ecommerce.git"
   },
-  "keywords": [],
+  "keywords": [
+    "food",
+    "ecommerce",
+    "grocery",
+    "delivery"
+  ],
   "author": "",
   "license": "ISC",
   "bugs": {
@@ -18,6 +27,17 @@
   },
   "homepage": "https://github.com/Phali003/Food-Ecommerce#readme",
   "dependencies": {
-    "normalize.css": "^8.0.1"
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "joi": "^17.9.2",
+    "jsonwebtoken": "^9.0.0",
+    "mysql2": "^3.3.1",
+    "nodemailer": "^6.9.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
   }
 }
