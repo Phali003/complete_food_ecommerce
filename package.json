@@ -38,6 +38,7 @@
   },
   "homepage": "https://github.com/Phali003/Food-Ecommerce#readme",
   "dependencies": {
+    "@sendgrid/mail": "^8.1.5",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -50,7 +51,8 @@
     "jsonwebtoken": "^9.0.2",
     "mysql2": "^3.14.1",
     "node-fetch": "^3.3.2",
-    "nodemailer": "^6.10.1"
+    "nodemailer": "^6.10.1",
+    "resend": "^4.5.1"
   },
   "devDependencies": {
     "cssnano": "^7.0.7",

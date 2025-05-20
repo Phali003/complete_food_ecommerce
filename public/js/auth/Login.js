@@ -42,7 +42,10 @@ const Login = () => {
       }
 
       // Send login request with credential support
-      const response = await axios.post('/api/auth/login', loginData, {
+      const response = await axios.post('/api/auth/login', {
+        identifier: formData.identifier,
+        password: formData.password
+      }, {
         withCredentials: true,
         headers: {
           'Content-Type': 'application/json',
@@ -56,6 +59,13 @@ const Login = () => {
         localStorage.setItem('userId', response.data.userId);
         localStorage.setItem('username', response.data.username);
         localStorage.setItem('userRole', response.data.role);
+        
+        // Log successful login
+        console.log('Login successful:', {
+          username: response.data.username,
+          role: response.data.role,
+          userId: response.data.userId
+        });
         
         // Set auth header for future requests
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;

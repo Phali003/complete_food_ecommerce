@@ -1,4 +1,89 @@
 /**
+ * Authentication controller for user management and authentication
+ */
+const { pool } = require('../config/database');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
+const { generateSecureToken, hashPassword, verifyPassword } = require('../utils/securityUtils');
+const emailService = require('../services/emailService');
+const BlacklistedTokenModel = require('../models/BlacklistedTokenModel');
+
+/**
+ * Register a new user
+ * @param {Object} req - HTTP request object
+ * @param {Object} res - HTTP response object
+ * @returns {Object} JSON response
+ */
+const signup = async (req, res) => {
+  const { username, email, password, confirm_password } = req.body;
+  
+  try {
+    console.log('Processing signup request for:', email);
+    
+    // Input validation
+    if (!username || !email || !password || !confirm_password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields'
+      });
+    }
+    
+    if (password !== confirm_password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match'
+      });
+    }
+    
+    // Password strength validation
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain at least 8 characters, including uppercase, lowercase, number and special character'
+      });
+    }
+    
+    let connection;
+    try {
+      connection = await pool.getConnection();
+      
+      // Check if user already exists
+      const [existingUsers] = await connection.execute(
+        'SELECT * FROM users WHERE email = ? OR username = ?',
+        [email, username]
+      );
+      
+      if (existingUsers.length > 0) {
+        const existingUser = existingUsers[0];
+        if (existingUser.email === email) {
+          return res.status(400).json({
+            success: false,
+            message: 'Email already in use'
+          });
+        }
+        if (existingUser.username === username) {
+          return res.status(400).json({
+            success: false,
+            message: 'Username already taken'
+          });
+        }
+      }
+      
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      // Insert new user
+      const [result] = await connection.execute(
+        'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
+        [username, email, hashedPassword, 'user']
+      );
+      
+      // Generate token
+      const token =
+
+/**
  * authController.js - Authentication and user management
  * Handles user authentication, admin management, and test endpoints
  */
@@ -305,6 +390,10 @@ const signup = async (req, res) => {
  * Supports login with either email or username
  */
 const login = async (req, res) => {
+  // Get a database connection for rate limiting and audit logging
+  let connection = null;
+  const clientIP = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  
   try {
     console.log('Starting login process with detailed logging');
     console.log('Database config:', {
@@ -328,6 +417,38 @@ const login = async (req, res) => {
     const { identifier, password } = req.body;
     console.log('Login attempt with identifier:', identifier);
 
+    // Get connection for checking rate limits
+    connection = await getConnection();
+    
+    // Check rate limiting by IP and identifier to prevent brute force attacks
+    const [loginAttempts] = await connection.execute(
+      'SELECT COUNT(*) as count FROM login_attempts WHERE identifier = ? AND ip_address = ? AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)',
+      [identifier, clientIP]
+    );
+    
+    // Rate limit: 5 attempts per 15 minutes from the same IP for the same identifier
+    if (loginAttempts[0].count >= 5) {
+      console.log(`Rate limit exceeded for ${identifier} from IP ${clientIP}`);
+      
+      // Log the rate limit event
+      await connection.execute(
+        'INSERT INTO audit_log (event_type, event_description, ip_address) VALUES (?, ?, ?)',
+        ['RATE_LIMIT_EXCEEDED', `Login rate limit exceeded for ${identifier}`, clientIP]
+      );
+      
+      return res.status(429).json({
+        success: false,
+        message: 'Too many login attempts. Please try again later.',
+        retryAfter: 900 // 15 minutes in seconds
+      });
+    }
+
+    // Record login attempt for rate limiting
+    await connection.execute(
+      'INSERT INTO login_attempts (identifier, ip_address, user_agent) VALUES (?, ?, ?)',
+      [identifier, clientIP, req.headers['user-agent'] || 'unknown']
+    );
+
     // Find user by email or username with specific error handling
     let user = null;
     try {
@@ -345,6 +466,13 @@ const login = async (req, res) => {
 
     if (!user) {
       console.log('No user found for identifier:', identifier);
+      // Log failed login attempt in audit log
+      if (connection) {
+        await connection.execute(
+          'INSERT INTO audit_log (event_type, event_description, ip_address) VALUES (?, ?, ?)',
+          ['FAILED_LOGIN', `No user found for identifier: ${identifier}`, clientIP]
+        );
+      }
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
@@ -357,6 +485,26 @@ const login = async (req, res) => {
       hasPassword: !!user.password_hash
     });
 
+    // Check if account is locked or inactive
+    if (user.is_locked || (user.is_active === false)) {
+      console.log(`Account is ${user.is_locked ? 'locked' : 'inactive'} for user:`, user.username);
+      
+      // Log event
+      if (connection) {
+        await connection.execute(
+          'INSERT INTO audit_log (user_id, event_type, event_description, ip_address) VALUES (?, ?, ?, ?)',
+          [user.id, 'ACCESS_DENIED', `Login attempt on ${user.is_locked ? 'locked' : 'inactive'} account`, clientIP]
+        );
+      }
+      
+      return res.status(403).json({
+        success: false,
+        message: user.is_locked ? 
+          'This account has been temporarily locked. Please contact support or try again later.' : 
+          'This account is inactive. Please contact an administrator.'
+      });
+    }
+
     // Verify password with specific error handling
     let isPasswordValid = false;
     try {
@@ -368,72 +516,100 @@ const login = async (req, res) => {
 
     if (!isPasswordValid) {
       console.log('Invalid password for user:', user.username);
+      
+      // Log failed login in audit log
+      if (connection) {
+        await connection.execute(
+          'INSERT INTO audit_log (user_id, event_type, event_description, ip_address) VALUES (?, ?, ?, ?)',
+          [user.id, 'FAILED_LOGIN', 'Invalid password', clientIP]
+        );
+        
+        // Check for consecutive failed attempts to implement account locking
+        const [failedAttempts] = await connection.execute(
+          'SELECT COUNT(*) as count FROM audit_log WHERE user_id = ? AND event_type = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
+          [user.id, 'FAILED_LOGIN']
+        );
+        
+        // If more than 5 failed attempts in the last hour, lock the account
+        if (failedAttempts[0].count >= 5) {
+          await connection.execute(
+            'UPDATE users SET is_locked = TRUE, locked_at = NOW() WHERE id = ?',
+            [user.id]
+          );
+          
+          // Log account lock event
+          await connection.execute(
+            'INSERT INTO audit_log (user_id, event_type, event_description, ip_address) VALUES (?, ?, ?, ?)',
+            [user.id, 'ACCOUNT_LOCKED', 'Account locked after consecutive failed login attempts', clientIP]
+          );
+        }
+      }
+      
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
     }
 
+    // Handle successful login - update last login timestamp
+    await connection.execute(
+      'UPDATE users SET last_login = NOW(), login_count = IFNULL(login_count, 0) + 1, is_locked = FALSE, locked_at = NULL WHERE id = ?',
+      [user.id]
+    );
+    
+    // Log successful login in audit log
+    await connection.execute(
+      'INSERT INTO audit_log (user_id, event_type, event_description, ip_address) VALUES (?, ?, ?, ?)',
+      [user.id, 'SUCCESSFUL_LOGIN', `Login from ${req.headers['user-agent'] || 'unknown browser'}`, clientIP]
+    );
+    
+    // Clear failed login attempts for this identifier and IP
+    await connection.execute(
+      'DELETE FROM login_attempts WHERE identifier = ? AND ip_address = ?',
+      [identifier, clientIP]
+    );
+
     // Generate token
     const token = generateToken(user);
 
-      // Set cookie with improved settings for cross-origin authentication
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours
-        path: '/',
-        domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
-      });
-
-      // Log cookie settings for debugging
-      console.log('Setting auth cookie with config:', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined,
-        env: process.env.NODE_ENV
-      });
-
-    console.log('Successful login for user:', user.username);
-    console.log('Cookie settings:', {
+    // Set cookie with improved settings for cross-origin authentication
+    res.cookie('token', token, {
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+      path: '/',
       domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
     });
+    
+    // Log cookie settings for debugging
+    console.log('Setting auth cookie on login with config:', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined,
+      env: process.env.NODE_ENV
+    });
 
-    // Return user data and token
+    // Return user data with token
     return res.status(200).json({
       success: true,
-      message: 'Logged in successfully',
-      data: {
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role
-        },
-        token
-      }
+      message: 'Login successful',
+      token,
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      isAdmin: user.role === 'admin'
     });
   } catch (error) {
     console.error('Login error:', error);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      code: error.code,
-      errno: error.errno,
-      sqlState: error.sqlState,
-      sqlMessage: error.sqlMessage
-    });
-    
-    // Return a specific status code and message based on the error
-    return res.status(500).json({
-      success: false,
-      message: 'Server error during login',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
+    return handleError(res, error, 'Server error during login');
+  } finally {
+    // Always release the connection to prevent connection leaks
+    if (connection) {
+      connection.release();
+    }
   }
 };
 
@@ -703,66 +879,6 @@ const resetAdminPassword = async (req, res) => {
   }
 };
 
-/**
- * Test Endpoints
- */
-const testSuccess = (req, res) => {
-    return res.status(200).json({
-        success: true,
-        message: "Test endpoint successful",
-        timestamp: new Date().toISOString()
-    });
-};
-
-const testError = (req, res) => {
-    return res.status(500).json({
-        success: false,
-        message: "Test error endpoint",
-        error: "This is a test error"
-    });
-};
-
-const testDatabase = async (req, res) => {
-    try {
-        const connection = await pool.testDirectConnection();
-        return res.status(200).json({
-            success: true,
-            message: "Database connection test",
-            result: connection ? "successful" : "failed"
-        });
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: "Database connection test failed",
-            error: error.message
-        });
-    }
-};
-
-const testCreateUser = async (req, res) => {
-    try {
-        const testUser = {
-            username: `test_${Date.now()}`,
-            email: `test_${Date.now()}@example.com`,
-            password: "Test123!"
-        };
-        
-        const user = await UserModel.createUser(testUser);
-        
-        return res.status(201).json({
-            success: true,
-            message: "Test user created successfully",
-            userId: user.id,
-            username: user.username
-        });
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: "Failed to create test user",
-            error: error.message
-        });
-    }
-};
 
 /**
  * Admin Management Functions
@@ -987,6 +1103,275 @@ const getAdminDetails = async (req, res) => {
     }
 };
 
+/**
+ * Initiates the password reset process by generating a token and sending an email
+ * @param {Object} req - HTTP request object
+ * @param {Object} res - HTTP response object
+ * @returns {Object} JSON response
+ */
+const forgotPassword = async (req, res) => {
+  const connection = await getConnection();
+  const clientIP = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  
+  try {
+    console.log('Processing forgot password request');
+    
+    // Validate the email from request body
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required'
+      });
+    }
+    
+    // Check rate limiting to prevent abuse
+    const [resetAttempts] = await connection.execute(
+      'SELECT COUNT(*) as count FROM password_reset_tokens WHERE email = ? AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)',
+      [email]
+    );
+    
+    if (resetAttempts[0].count >= 3) {
+      // Log rate limit exceeded
+      await connection.execute(
+        'INSERT INTO audit_log (event_type, event_description, ip_address) VALUES (?, ?, ?)',
+        ['RATE_LIMIT_EXCEEDED', `Rate limit exceeded for password reset attempts on ${email}`, clientIP]
+      );
+      
+      return res.status(429).json({
+        success: false,
+        message: 'Too many reset attempts. Please try again later.',
+        retryAfter: 900 // 15 minutes in seconds
+      });
+    }
+    
+    // Check if user exists
+    const [users] = await connection.execute(
+      'SELECT id, username FROM users WHERE email = ?',
+      [email]
+    );
+    
+    // Always return success whether account exists or not to prevent user enumeration
+    if (users.length === 0) {
+      console.log(`Password reset requested for non-existent email: ${email}`);
+      
+      // Log the attempt for non-existent user
+      await connection.execute(
+        'INSERT INTO audit_log (event_type, event_description, ip_address) VALUES (?, ?, ?)',
+        ['PASSWORD_RESET_REQUEST', `Password reset requested for non-existent email: ${email}`, clientIP]
+      );
+      
+      return res.status(200).json({
+        success: true,
+        message: 'If an account exists with that email, a password reset link will be sent.'
+      });
+    }
+    
+    const user = users[0];
+    
+    // Generate secure token for password reset
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    
+    // Store token in database (invalidating any previous tokens)
+    await connection.execute(
+      'DELETE FROM password_reset_tokens WHERE email = ?',
+      [email]
+    );
+    
+    // Set expiration to 1 hour from now
+    const tokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+    
+    await connection.execute(
+      'INSERT INTO password_reset_tokens (email, token, expires_at, user_id) VALUES (?, ?, ?, ?)',
+      [email, tokenHash, tokenExpiry, user.id]
+    );
+    
+    // Create a reset link with the token
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+    
+    // Send the email using the emailService
+    const emailResult = await emailService.sendPasswordResetEmail({
+      email,
+      username: user.username,
+      resetUrl
+    });
+    
+    if (!emailResult.success) {
+      console.error('Failed to send password reset email:', emailResult.error);
+      throw new Error('Failed to send password reset email');
+    }
+    
+    // Log the password reset request
+    await connection.execute(
+      'INSERT INTO audit_log (user_id, event_type, event_description, ip_address) VALUES (?, ?, ?, ?)',
+      [user.id, 'PASSWORD_RESET_REQUEST', 'Password reset email sent', clientIP]
+    );
+    
+    return res.status(200).json({
+      success: true,
+      message: 'If an account exists with that email, a password reset link will be sent.'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return handleError(res, error, 'Error processing password reset request');
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+/**
+ * Resets a user's password using a valid token
+ * @param {Object} req - HTTP request object
+ * @param {Object} res - HTTP response object
+ * @returns {Object} JSON response
+ */
+const resetPassword = async (req, res) => {
+  const connection = await getConnection();
+  const clientIP = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  
+  try {
+    console.log('Processing password reset');
+    
+    const { token, password, confirmPassword } = req.body;
+    
+    // Validate required fields
+    if (!token || !password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token, password and confirm password are required'
+      });
+    }
+    
+    // Check if passwords match
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match'
+      });
+    }
+    
+    // Validate password complexity
+    const passwordValidation = validatePasswordComplexity(password);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password does not meet complexity requirements',
+        errors: passwordValidation.errors
+      });
+    }
+    
+    // Hash the incoming token
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    
+    // Find the token record
+    const [tokenRecords] = await connection.execute(
+      'SELECT * FROM password_reset_tokens WHERE token = ? AND expires_at > NOW()',
+      [tokenHash]
+    );
+    
+    if (tokenRecords.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired password reset token'
+      });
+    }
+    
+    const tokenRecord = tokenRecords[0];
+    
+    // Retrieve the user
+    const [users] = await connection.execute(
+      'SELECT id, email, username, password_hash FROM users WHERE id = ?',
+      [tokenRecord.user_id]
+    );
+    
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    const user = users[0];
+    
+    // Check if new password matches current password
+    const isSameAsCurrent = await bcrypt.compare(password, user.password_hash);
+    if (isSameAsCurrent) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password cannot be the same as the current password'
+      });
+    }
+    
+    // Check password history to prevent reuse
+    const [passwordHistory] = await connection.execute(
+      'SELECT password_hash FROM password_history WHERE user_id = ? ORDER BY created_at DESC LIMIT 3',
+      [user.id]
+    );
+    
+    // Check against previous passwords
+    for (const history of passwordHistory) {
+      const isPasswordReused = await bcrypt.compare(password, history.password_hash);
+      if (isPasswordReused) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot reuse recent passwords'
+        });
+      }
+    }
+    
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    
+    // Start a transaction for updating password and related operations
+    await connection.beginTransaction();
+    
+    try {
+      // Update the user's password
+      await connection.execute(
+        'UPDATE users SET password_hash = ? WHERE id = ?',
+        [hashedPassword, user.id]
+      );
+      
+      // Store the old password in password history
+      await connection.execute(
+        'INSERT INTO password_history (user_id, password_hash) VALUES (?, ?)',
+        [user.id, user.password_hash]
+      );
+      
+      // Delete the used token
+      await connection.execute(
+        'DELETE FROM password_reset_tokens WHERE token = ?',
+        [tokenHash]
+      );
+      
+      // Log the successful password reset
+      await connection.execute(
+        'INSERT INTO audit_log (user_id, event_type, event_description, ip_address) VALUES (?, ?, ?, ?)',
+        [user.id, 'PASSWORD_RESET_SUCCESS', 'Password reset completed successfully', clientIP]
+      );
+      
+      // Commit the transaction
+      await connection.commit();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Password has been reset successfully'
+      });
+    } catch (error) {
+      // Rollback if any error occurs
+      await connection.rollback();
+      throw error;
+    }
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return handleError(res, error, 'Error resetting password');
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
 // Export all controller methods
 module.exports = {
   // User authentication
@@ -994,12 +1379,9 @@ module.exports = {
   login,
   logout,
   getProfile,
+  forgotPassword,
+  resetPassword,
   
-  // Test endpoints
-  testSuccess,
-  testError,
-  testDatabase,
-  testCreateUser,
   
   // Admin management
   setupInitialAdmin,

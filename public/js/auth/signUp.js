@@ -385,26 +385,26 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(async response => {
             // Check if the response is JSON
             const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/json')) {
-                return response.json().then(data => {
-                    // Return both the response status and data together
+            
+            try {
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
                     return { status: response.status, data };
-                });
-            } else {
-                // If not JSON, handle text response
-                try {
+                } else {
+                    // If not JSON, handle text response
                     const text = await response.text();
                     return { 
                         status: response.status, 
                         data: { message: text || 'Unknown error occurred' } 
                     };
-                } catch (e) {
-                    // If all else fails
-                    return { 
-                        status: response.status, 
-                        data: { message: 'Unable to parse server response' } 
-                    };
                 }
+            } catch (e) {
+                console.error('Error parsing response:', e);
+                // If all else fails
+                return { 
+                    status: response.status, 
+                    data: { message: 'Unable to parse server response' } 
+                };
             }
         })
         .then(result => {
@@ -436,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let errorMessage = data.message || 'Registration failed';
                 
                 // Parse specific error types
-                if (errorMessage.includes('already exists')) {
+                if (errorMessage.includes('already exists') || errorMessage.includes('already in use') || errorMessage.includes('already taken')) {
                     if (errorMessage.toLowerCase().includes('email')) {
                         errorMessage = 'This email is already registered. Please use a different email.';
                         signupEmail.classList.add('error');
@@ -449,7 +449,34 @@ document.addEventListener('DOMContentLoaded', () => {
                         usernameError.classList.add('visible');
                     }
                 } else if (status === 400) {
-                    errorMessage = 'Please check your registration details and try again.';
+                    // Check for validation errors in the response
+                    if (data.errors && Array.isArray(data.errors)) {
+                        // New API format might include validation errors array
+                        const validationErrors = data.errors;
+                        
+                        // Process each validation error and update the UI accordingly
+                        validationErrors.forEach(error => {
+                            if (error.field === 'email') {
+                                signupEmail.classList.add('error');
+                                emailError.textContent = error.message;
+                                emailError.classList.add('visible');
+                            } else if (error.field === 'username') {
+                                signupUsername.classList.add('error');
+                                usernameError.textContent = error.message;
+                                usernameError.classList.add('visible');
+                            } else if (error.field === 'password') {
+                                signupPassword.classList.add('error');
+                                passwordError.textContent = error.message;
+                                passwordError.classList.add('visible');
+                            }
+                        });
+                        
+                        errorMessage = 'Please fix the errors in the form and try again.';
+                    } else {
+                        errorMessage = 'Please check your registration details and try again.';
+                    }
+                } else if (status === 500) {
+                    errorMessage = 'Server error. Our team has been notified. Please try again later.';
                 }
                 
                 // Display the error
@@ -484,8 +511,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 errorMessage = 'Request was cancelled. Please try again.';
             } else if (error.name === 'TimeoutError' || error.message.includes('timeout')) {
                 errorMessage = 'Request timed out. The server may be busy, please try again later.';
-            } else if (error.message && error.message.includes('CORS')) {
-                errorMessage = 'Unable to connect to the server. CORS error. Please try again later.';
+            } else if (error.message && (error.message.includes('CORS') || error.message.includes('cross-origin'))) {
+                errorMessage = 'Unable to connect to the server. CORS policy issue. Please try again later.';
+            } else if (error.message && error.message.includes('SSL')) {
+                errorMessage = 'Secure connection issue. Please reload the page and try again.';
             }
             
             // Display the error

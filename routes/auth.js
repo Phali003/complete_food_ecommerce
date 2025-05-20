@@ -2,9 +2,9 @@ const express = require("express");
 const router = express.Router();
 const { protect } = require("../middleware/auth");
 const bcrypt = require("bcryptjs");
-const nodemailer = require("nodemailer");
 const pool = require("../config/database");
-const crypto = require('crypto');  // Add this line
+const crypto = require('crypto');
+const emailService = require('../services/emailService');
 
 const {
   // User authentication
@@ -12,12 +12,6 @@ const {
   login,
   logout,
   getProfile,
-
-  // Test endpoints
-  testSuccess,
-  testError,
-  testDatabase,
-  testCreateUser,
 
   // Admin management
   setupInitialAdmin,
@@ -89,28 +83,15 @@ router.get("/profile", protect, getProfile);
  * - Frontend pages (forgot-password.html and reset-password.html) are created and connected
  */
 
-// Import emailTester utility for email configuration validation
-const { testEmailConfig, getEmailTroubleshooting } = require('../utils/emailTester');
-
-// Forgot Password Route - Using the same connection handling as our successful test
+// Forgot Password Route - Using the main connection pool for efficiency
 router.post('/forgot-password', async (req, res) => {
-  // Create a new pool for this request
-  const mysql = require('mysql2/promise');
-  const newPool = await mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
-  
+  let connection;
   let resetToken;
+  const requestId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
   
   try {
     const { email } = req.body;
-    console.log('Starting password reset process for:', email);
+    console.log(`[${requestId}] Starting password reset process for: ${email}`);
 
     // Basic validation
     if (!email) {
@@ -120,172 +101,208 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
     
-    // Pre-validate email configuration
-    const requiredEmailConfigs = [
-      'EMAIL_HOST', 
-      'EMAIL_PORT', 
-      'EMAIL_USER', 
-      'EMAIL_PASSWORD'
-    ];
-    
-    const missingConfigs = requiredEmailConfigs.filter(config => !process.env[config]);
-    if (missingConfigs.length > 0) {
-      console.error('Missing email configuration:', missingConfigs);
+    // Pre-validate Resend API key configuration with more detailed error logging
+    if (!process.env.RESEND_API_KEY) {
+      console.error(`[${requestId}] CRITICAL CONFIG ERROR: Missing email configuration: RESEND_API_KEY`);
+      console.error(`[${requestId}] Environment variables available: ${Object.keys(process.env).filter(key => !key.includes('KEY') && !key.includes('SECRET')).join(', ')}`);
       return res.status(500).json({
         success: false,
-        message: 'Email service is not properly configured. Please contact support.'
+        message: 'Email service is not properly configured. Please contact support.',
+        errorCode: 'EMAIL_CONFIG_MISSING'
+      });
+    }
+
+    // Validate Resend API key format (basic check)
+    if (!process.env.RESEND_API_KEY.startsWith('re_')) {
+      console.error(`[${requestId}] CRITICAL CONFIG ERROR: Invalid Resend API key format. Keys should start with "re_"`);
+      return res.status(500).json({
+        success: false,
+        message: 'Email service configuration is invalid. Please contact support.',
+        errorCode: 'EMAIL_CONFIG_INVALID'
       });
     }
 
     // Validate EMAIL_DOMAIN (needed for CORS and proper email link generation)
     if (!process.env.EMAIL_DOMAIN) {
-      console.warn('EMAIL_DOMAIN environment variable is not set. Using fallback domain from request.');
+      console.warn(`[${requestId}] CONFIG WARNING: EMAIL_DOMAIN environment variable is not set. Using fallback domain from request.`);
+      console.warn(`[${requestId}] This may cause issues with password reset links if the request domain doesn't match the deployed frontend.`);
       // We'll continue but log this warning
+    } else {
+      console.log(`[${requestId}] Using configured EMAIL_DOMAIN: ${process.env.EMAIL_DOMAIN}`);
     }
 
-    // 1. Find user
-    console.log('Finding user...');
+    // Get a connection from the pool
     try {
-      const [rows] = await newPool.execute(
+      console.log(`[${requestId}] Attempting to get database connection...`);
+      connection = await pool.getConnection();
+      console.log(`[${requestId}] Database connection established successfully`);
+    } catch (dbConnError) {
+      console.error(`[${requestId}] DATABASE CONNECTION ERROR:`, {
+        message: dbConnError.message,
+        code: dbConnError.code,
+        errno: dbConnError.errno,
+        sqlState: dbConnError.sqlState,
+        sqlMessage: dbConnError.sqlMessage
+      });
+      return res.status(500).json({
+        success: false,
+        message: 'Unable to connect to the database. Please try again later.',
+        errorCode: 'DB_CONNECTION_ERROR'
+      });
+    }
+    
+    // 1. Find user
+    console.log(`[${requestId}] Finding user with email: ${email}`);
+    try {
+      const [rows] = await connection.execute(
         'SELECT id, username, email FROM users WHERE email = ?',
         [email]
       );
-      console.log('Database query results:', { found: rows.length > 0 });
+      console.log(`[${requestId}] Database query results:`, { 
+        found: rows.length > 0, 
+        count: rows.length,
+        userId: rows.length > 0 ? rows[0].id : null
+      });
 
       // Check if user exists and return appropriate response
       if (!rows || rows.length === 0) {
         // Email doesn't exist in the system
+        console.log(`[${requestId}] User not found with email: ${email}`);
         return res.status(404).json({
           success: false,
-          message: 'No account found with this email address'
+          message: 'No account found with this email address',
+          errorCode: 'USER_NOT_FOUND'
         });
       }
 
       // 2. User exists, generate and store token
       const user = rows[0];
-      console.log('Found user:', { id: user.id, username: user.username });
+      console.log(`[${requestId}] Found user:`, { 
+        id: user.id, 
+        username: user.username,
+        email: user.email.substring(0, 3) + '***' + user.email.substring(user.email.indexOf('@'))
+      });
       
-      // Generate token
-      resetToken = crypto.randomBytes(20).toString('hex');
-      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
-      console.log('Token generated with expiry:', resetTokenExpiry);
+      // Generate token with improved randomness
+      try {
+        resetToken = crypto.randomBytes(32).toString('hex'); // Increased from 20 to 32 bytes for more security
+        const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+        console.log(`[${requestId}] Token generated with expiry:`, resetTokenExpiry);
+      } catch (cryptoError) {
+        console.error(`[${requestId}] CRYPTO ERROR: Failed to generate secure token:`, cryptoError);
+        return res.status(500).json({
+          success: false,
+          message: 'Error generating secure reset token. Please try again.',
+          errorCode: 'TOKEN_GENERATION_ERROR'
+        });
+      }
 
       try {
         // Update user with reset token
-        console.log('Updating user with reset token...');
-        await newPool.execute(
+        console.log(`[${requestId}] Updating user with reset token...`);
+        const updateStart = Date.now();
+        const [updateResult] = await connection.execute(
           'UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?',
           [resetToken, resetTokenExpiry, user.id]
         );
+        console.log(`[${requestId}] Token update completed in ${Date.now() - updateStart}ms, affected rows:`, updateResult.affectedRows);
+        
+        if (updateResult.affectedRows !== 1) {
+          throw new Error(`Expected to update 1 row, but updated ${updateResult.affectedRows} rows instead`);
+        }
 
         // Verify token storage
-        console.log('Verifying token storage...');
-        const [verifyResult] = await newPool.execute(
+        console.log(`[${requestId}] Verifying token storage...`);
+        const [verifyResult] = await connection.execute(
           'SELECT reset_token, reset_token_expiry FROM users WHERE id = ?',
           [user.id]
         );
-        console.log('Token verification result:', {
-          token_stored: verifyResult[0].reset_token === resetToken,
-          expiry_valid: new Date(verifyResult[0].reset_token_expiry) > new Date()
+        
+        const tokenStored = verifyResult[0].reset_token === resetToken;
+        const expiryValid = new Date(verifyResult[0].reset_token_expiry) > new Date();
+        
+        console.log(`[${requestId}] Token verification result:`, {
+          token_stored: tokenStored,
+          expiry_valid: expiryValid,
+          expiry_time: verifyResult[0].reset_token_expiry,
+          token_length: verifyResult[0].reset_token?.length
         });
-
+        
+        if (!tokenStored || !expiryValid) {
+          console.error(`[${requestId}] DATABASE ERROR: Token verification failed:`, {
+            tokenStored,
+            expiryValid,
+            userId: user.id
+          });
+          throw new Error('Failed to verify stored token integrity');
+        }
         // Determine domain to use (prefer EMAIL_DOMAIN env var, fallback to request host)
         const domain = process.env.EMAIL_DOMAIN || `${req.protocol}://${req.get('host')}`;
-        console.log('Using domain for reset URL:', domain);
+        console.log(`[${requestId}] Using domain for reset URL:`, domain);
+        
+        // Log request details to help debug domain/CORS issues
+        console.log(`[${requestId}] Request details:`, {
+          protocol: req.protocol,
+          originalUrl: req.originalUrl,
+          host: req.get('host'),
+          origin: req.get('origin'),
+          referer: req.get('referer')
+        });
         
         // Create reset URL with the proper domain
         const resetUrl = `${domain}/reset-password.html?token=${resetToken}`;
+        console.log(`[${requestId}] Generated reset URL: ${resetUrl.substring(0, resetUrl.indexOf('token=') + 6)}[TOKEN-REDACTED]`);
 
+        // Email sending block
         try {
-          // Test email configuration before attempting to send
-          console.log('Configuring and testing email transport...');
-          const transporter = nodemailer.createTransport({
-            host: process.env.EMAIL_HOST,
-            port: parseInt(process.env.EMAIL_PORT),
-            secure: process.env.EMAIL_SECURE === 'true',
-            auth: {
-              user: process.env.EMAIL_USER,
-              pass: process.env.EMAIL_PASSWORD
-            },
-            // Add connection timeout to detect issues faster
-            connectionTimeout: 10000 // 10 seconds
-          });
-
-          // Verify SMTP connection configuration
-          await transporter.verify().catch(err => {
-            console.error('SMTP verification failed:', err);
-            throw new Error(`SMTP configuration error: ${err.message}`);
-          });
+          console.log(`[${requestId}] Preparing to send password reset email to:`, user.email);
           
-          console.log('SMTP configuration verified successfully');
-
-          console.log('Sending password reset email to:', user.email);
-          console.log('Reset URL:', resetUrl);
+          // Time the email operation for performance monitoring
+          const emailStartTime = Date.now();
           
-          const mailOptions = {
-            from: `"Fresh Eats Market" <${process.env.EMAIL_USER}>`,
-            to: user.email,
-            subject: 'Password Reset Request',
-            html: `
-              <h1>Password Reset Request</h1>
-              <p>Hello ${user.username},</p>
-              <p>You requested to reset your password. Please click the link below to reset it:</p>
-              <a href="${resetUrl}">Reset Password</a>
-              <p>This link will expire in 1 hour.</p>
-              <p>If you didn't request this, please ignore this email.</p>
-            `,
-            // Include plain text alternative for better deliverability
-            text: `
-              Password Reset Request
-              
-              Hello ${user.username},
-              
-              You requested to reset your password. Please use the link below to reset it:
-              
-              ${resetUrl}
-              
-              This link will expire in 1 hour.
-              
-              If you didn't request this, please ignore this email.
-            `
-          };
-
-          const mailResult = await transporter.sendMail(mailOptions);
-          console.log('Email sent successfully:', {
-            messageId: mailResult.messageId,
-            response: mailResult.response
-          });
-        } catch (emailError) {
-          console.error('Email sending error details:', {
-            error: emailError.message,
-            stack: emailError.stack,
-            code: emailError.code,
-            command: emailError.command,
-            emailConfig: {
-              host: process.env.EMAIL_HOST,
-              port: process.env.EMAIL_PORT,
-              secure: process.env.EMAIL_SECURE,
-              user: process.env.EMAIL_USER ? '***PROVIDED***' : '***MISSING***'
-            }
-          });
+          // Check if Resend service is operational with preventive logging
+          if (!emailService || typeof emailService.sendPasswordResetEmail !== 'function') {
+            console.error(`[${requestId}] EMAIL SERVICE ERROR: Email service is not properly initialized or missing sendPasswordResetEmail function`);
+            return res.status(500).json({
+              success: false,
+              message: 'Email service is not available at the moment. Please try again later or contact support.',
+              errorCode: 'EMAIL_SERVICE_ERROR'
+            });
+          }
           
+          try {
+            // Send password reset email using the email service
+            await emailService.sendPasswordResetEmail({
+              to: user.email,
+              resetToken: resetToken,
+              resetUrl: resetUrl
+            });
+            
+            const emailDuration = Date.now() - emailStartTime;
+            console.log(`[${requestId}] Password reset email sent successfully to: ${user.email} (took ${emailDuration}ms)`);
+            
+            // Return success for valid email with reset instructions sent
+            return res.status(200).json({
+              success: true,
+              message: 'Password reset instructions have been sent to your email',
+              // Only in development mode, return the token for testing
+              ...(process.env.NODE_ENV === 'development' ? {
+                resetToken: resetToken,
+                resetUrl: resetUrl
+              } : {})
+            });
+          } catch (emailSendError) {
+            console.error(`[${requestId}] Failed to send password reset email:`, emailSendError);
+            throw new Error(`Failed to send email: ${emailSendError.message}`);
+          }
+        } catch (emailServiceError) {
+          console.error(`[${requestId}] Email service error:`, emailServiceError);
           return res.status(500).json({
             success: false,
-            message: 'Failed to send reset email. Please try again later or contact support.',
-            error: process.env.NODE_ENV === 'development' ? emailError.message : undefined
+            message: 'Unable to send password reset email. Please try again later or contact support.',
+            errorCode: 'EMAIL_SEND_FAILED'
           });
         }
-
-        // Return success for valid email with reset instructions sent
-        return res.status(200).json({
-          success: true,
-          message: 'Password reset instructions have been sent to your email',
-          // Only in development mode, return the token for testing
-          ...(process.env.NODE_ENV === 'development' ? {
-            resetToken: resetToken,
-            resetUrl: resetUrl
-          } : {})
-        });
       } catch (dbError) {
         console.error('Database error during token storage:', dbError);
         throw new Error(`Database error: ${dbError.message}`);
@@ -310,24 +327,16 @@ router.post('/forgot-password', async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   } finally {
-    // Make sure to end the pool when done
-    await newPool.end();
+    // Make sure to release the connection when done
+    if (connection) {
+      connection.release();
+    }
   }
 });
 
-// Reset Password Route - Using exact implementation from successful debug test
+// Reset Password Route - Updated to use the main pool connection
 router.post('/reset-password', async (req, res) => {
-    // Create a new pool specifically for this request
-    const mysql = require('mysql2/promise');
-    const pool = await mysql.createPool({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
-        waitForConnections: true,
-        connectionLimit: 10,
-        queueLimit: 0
-    });
+    let connection;
 
     try {
         // Log the request for debugging
@@ -371,8 +380,11 @@ router.post('/reset-password', async (req, res) => {
         // Only validate token when actually resetting the password
         console.log('Checking token validity');
         
+        // Get a connection from the pool
+        connection = await pool.getConnection();
+        
         // Find user with valid reset token
-        const [rows] = await pool.execute(
+        const [rows] = await connection.execute(
             'SELECT id, email, username FROM users WHERE reset_token = ? AND reset_token_expiry > NOW()',
             [token]
         );
@@ -392,15 +404,15 @@ router.post('/reset-password', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         // Update password and clear reset token
-        await pool.execute(
+        await connection.execute(
             'UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?',
             [hashedPassword, user.id]
         );
 
         // Store in password history
-        await pool.execute(
+        await connection.execute(
             'INSERT INTO password_history (user_id, password_hash) VALUES (?, ?)',
-            [user.id, hashedPassword]
+            [user.id, user.password_hash || 'password_reset']
         );
 
         console.log('Password reset successful');
@@ -417,7 +429,10 @@ router.post('/reset-password', async (req, res) => {
             ...(process.env.NODE_ENV === 'development' ? { error: error.message } : {})
         });
     } finally {
-        await pool.end();
+        // Release the connection rather than ending the pool
+        if (connection) {
+            connection.release();
+        }
     }
 });
 
@@ -431,17 +446,6 @@ router.get("/list-admins", listAdmins); // Consider adding protect middleware fo
 router.post("/migrate-admin", migrateAdmin);
 router.patch("/admin/update-status", protect, updateAdminStatus);
 router.get("/admin/details", protect, getAdminDetails);
-
-/**
- * Test Endpoints
- * Used for testing API functionality
- */
-router.get("/test-success", testSuccess);
-router.get("/test-error", testError);
-router.get("/test-db", testDatabase);
-router.post("/test-create-user", testCreateUser);
-
-// (Test endpoints related to reset password functionality have been removed)
 
 // Custom implementation of password reset route with security improvements
 router.post("/admin/reset-password", protect, async (req, res) => {

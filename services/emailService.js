@@ -208,8 +208,10 @@ async function sendPasswordResetEmail({ to, resetToken, resetUrl }) {
   const siteName = process.env.SITE_NAME || 'Fresh Eats Market';
   const tokenExpiry = parseInt(process.env.RESET_TOKEN_EXPIRY || '15');
   
-  // Build the full reset URL
-  const fullResetUrl = `${resetUrl}/reset-password.html?token=${resetToken}`;
+  // Build the full reset URL - avoid double paths if resetUrl already contains the full path
+  const fullResetUrl = resetUrl.includes('reset-password.html') 
+    ? resetUrl 
+    : `${resetUrl}/reset-password.html?token=${resetToken}`;
 
   return sendEmail({
     to: to,
