@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './Login.css';
 
+// Configure axios defaults for cross-origin requests
+axios.defaults.withCredentials = true;
+axios.defaults.headers.common['Accept'] = 'application/json';
+
 const Login = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -37,8 +41,14 @@ const Login = () => {
         loginData.username = formData.identifier;
       }
 
-      // Send login request
-      const response = await axios.post('/api/auth/login', formData);
+      // Send login request with credential support
+      const response = await axios.post('/api/auth/login', loginData, {
+        withCredentials: true,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
       
       if (response.data.success) {
         // Store auth data
@@ -62,10 +72,30 @@ const Login = () => {
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError(
-        err.response?.data?.message || 
-        'Login failed. Please check your credentials.'
-      );
+      
+      // More detailed error handling
+      let errorMessage;
+      
+      if (err.response) {
+        // Server responded with an error
+        if (err.response.status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else if (err.response.status === 401 || err.response.status === 403) {
+          errorMessage = 'Invalid credentials. Please check your email/username and password.';
+        } else if (err.response.data && err.response.data.message) {
+          errorMessage = err.response.data.message;
+        } else {
+          errorMessage = 'Login failed. Please check your credentials.';
+        }
+      } else if (err.request) {
+        // Request was made but no response received (network error)
+        errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+      } else {
+        // Something else caused the error
+        errorMessage = 'An unexpected error occurred. Please try again.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

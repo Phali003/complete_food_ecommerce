@@ -602,15 +602,16 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Send authentication request to server
         
-        // Make API request to login
+        // Make API request to login - ensure we're using a relative path with proper credentials
         fetch(LOGIN_ENDPOINT, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             },
             body: JSON.stringify(loginData),
-            credentials: 'same-origin' // Send cookies with the request
+            credentials: 'include' // Critical for cross-origin authentication with cookies
         })
         .then(response => {
             // Check if the response is JSON
@@ -626,6 +627,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     return { status: response.status, data: { message: text } };
                 });
             }
+        })
+        .catch(error => {
+            console.error('Error parsing response:', error);
+            return { status: 0, data: { message: 'Failed to parse server response: ' + error.message } };
         })
         .then(result => {
             const { status, data } = result;
@@ -657,12 +662,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } else {
                 // Failed login
-                handleFailedLogin(data.message || 'Invalid email/username or password');
+                let errorMessage = data.message || 'Invalid email/username or password';
+                
+                // Check for specific server errors
+                if (status === 500) {
+                    errorMessage = 'Server error. Please try again later or contact support.';
+                } else if (status === 503) {
+                    errorMessage = 'Service unavailable. The server is currently down for maintenance.';
+                } else if (status === 429) {
+                    errorMessage = 'Too many login attempts. Please try again later.';
+                } else if (status === 401 || status === 403) {
+                    errorMessage = 'Invalid credentials. Please check your email/username and password.';
+                }
+                
+                handleFailedLogin(errorMessage);
             }
         })
         .catch(error => {
+            console.error('Login error:', error);
             // Handle connection errors
-            handleFailedLogin('Network error. Please try again later.');
+            handleFailedLogin('Network error. Please try again later. Check your internet connection.');
         })
         .finally(() => {
             // Remove loading state
@@ -905,12 +924,14 @@ function handleSuccessfulLogin(user, token) {
         // Track this reset attempt
         trackResetAttempt(email);
         
+        // Use relative path for API endpoint
         fetch('/api/auth/forgot-password', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ email })
+            body: JSON.stringify({ email }),
+            credentials: 'include' // Add credentials for cross-origin support
         })
         .then(async response => {
             const data = await response.json();

@@ -1,4 +1,4 @@
-const { signup } = require('../controllers/authController');
+const { signup } = require('../../controllers/authController');
 
 /**
  * API route for user signup

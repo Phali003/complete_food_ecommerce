@@ -527,6 +527,9 @@ document.querySelectorAll(".modal").forEach((modal) => {
 
 // The visibilitychange event is already handled in initAdditionalEnhancements
 
+// Define lazyImageObserver at global scope to ensure it's available everywhere
+let lazyImageObserver = null;
+
 // Lazy load images with progressive enhancement
 if ("loading" in HTMLImageElement.prototype) {
   // Native lazy loading
@@ -535,8 +538,7 @@ if ("loading" in HTMLImageElement.prototype) {
   });
 } else {
   // Fallback lazy loading with Intersection Observer
-  // Fallback lazy loading with Intersection Observer
-  const lazyImageObserver = new IntersectionObserver((entries) => {
+  lazyImageObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
         try {
@@ -1094,6 +1096,11 @@ function initAdditionalEnhancements() {
   ];
 
   observers.forEach(({ name, ref }) => {
+    // Skip null observers (like lazyImageObserver when native lazy loading is used)
+    if (!ref) {
+      console.debug(`Observer ${name} not available, skipping registration`);
+      return;
+    }
     try {
       if (ref && !cleanupManager.observers.includes(ref)) {
         cleanupManager.registerObserver(ref);

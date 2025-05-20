@@ -71,42 +71,82 @@ if (process.env.NODE_ENV === "production") {
   app.use(limiter);
 }
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      const allowedOrigins = [
-        process.env.FRONTEND_URL,
-        'http://localhost:3000',
-        // Add any additional domains that might be used in email links
-        process.env.EMAIL_DOMAIN
-      ].filter(Boolean); // Remove any undefined values
-      
-      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-  })
-);
+// Define CORS options - consolidated configuration
+// Define CORS options - consolidated for all CORS handling
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl requests)
+    if (!origin) return callback(null, true);
+    
+    // In development, allow all origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    // In production, allow Render domains and explicitly defined origins
+    if (origin.endsWith('.onrender.com')) {
+      return callback(null, true);
+    }
+    
+    // Check against specific allowed origins
+    const allowedOrigins = [
+      'https://fresh-eats-market.onrender.com',
+      process.env.FRONTEND_URL,
+      process.env.EMAIL_DOMAIN
+    ].filter(Boolean);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked request from origin: ${origin}`);
+      callback(new Error('CORS: Origin not allowed'));
+    }
+  },
+  credentials: true, // Critical for authentication cookies
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Allow-Headers',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: ['Set-Cookie'],
+  maxAge: 86400, // 24 hours
+  preflightContinue: false, // Do not pass preflight requests to handlers
+  optionsSuccessStatus: 204 // Return 204 for OPTIONS requests
+};
+
+// Apply CORS middleware - must come before any route handlers
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Configure secure cookie settings
 const cookieConfig = {
-  httpOnly: process.env.COOKIE_HTTP_ONLY === "true",
-  secure: process.env.COOKIE_SECURE === "true",
-  sameSite: process.env.COOKIE_SAME_SITE || "strict",
+  httpOnly: true, // Always enable httpOnly for security
+  secure: process.env.NODE_ENV === "production", // Secure in production
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // None for cross-origin in production, lax for development
   maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 86400000, // 24 hours in milliseconds
   signed: true,
   path: "/",
+  // Only set domain in production and handle it correctly for Render
+  ...(process.env.NODE_ENV === "production" && {
+    domain: process.env.COOKIE_DOMAIN || ".onrender.com" // Explicitly set for all Render subdomains
+  })
 };
+
+// Log cookie configuration for debugging
+console.log('Cookie Configuration:', {
+  httpOnly: cookieConfig.httpOnly,
+  secure: cookieConfig.secure,
+  sameSite: cookieConfig.sameSite,
+  domain: cookieConfig.domain || 'not set',
+  environment: process.env.NODE_ENV
+});
 
 // JWT Configuration
 const jwtConfig = {
@@ -133,13 +173,11 @@ app.use((req, res, next) => {
 // Static files with enhanced configuration
 const staticOptions = {
   setHeaders: (res, filePath, stat) => {
-    // Set CORS headers for static files
-    res.set('Access-Control-Allow-Origin', '*');
-    res.set('Access-Control-Allow-Methods', 'GET');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
-
+    // Don't set CORS headers here since they're handled by the cors middleware
+    // This avoids conflicts with the global CORS settings
+    
     // Add Vary header to help with caching
-    res.set('Vary', 'Origin');
+    res.set('Vary', 'Origin, Accept-Encoding');
 
     // Different cache settings based on file type
     if (filePath.endsWith('.html')) {
@@ -194,6 +232,14 @@ app.use(
 );
 app.use("/pages", express.static(path.join(__dirname, "public/pages")));
 
+// API route logging middleware (removed OPTIONS handling as it's now at the top level)
+app.use("/api", (req, res, next) => {
+  if (req.method !== 'OPTIONS') {
+    console.log(`API Request: ${req.method} ${req.path}`);
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   if (req.url.startsWith("/api")) return next();
 
@@ -243,6 +289,21 @@ app.get("/", (req, res) => {
 });
 
 // API routes
+// Authentication error handler for auth routes
+app.use("/api/auth", (req, res, next) => {
+  // Handle authentication specific errors
+  try {
+    next();
+  } catch (error) {
+    console.error("Auth route error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Authentication error",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/products", protect, productRoutes);
 app.use("/api/cart", protect, cartRoutes);
@@ -376,22 +437,44 @@ app.use((req, res, next) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error("Server error:", err.stack);
+    console.error("Server error:", err.stack);
 
-  const statusCode = err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
+    // Handle CORS errors first
+    if (err.message && err.message.includes('CORS')) {
+      console.warn('CORS Error:', {
+        origin: req.headers.origin,
+        method: req.method,
+        path: req.path,
+        error: err.message
+      });
+      
+      // For OPTIONS requests, let the CORS middleware handle it
+      if (req.method === 'OPTIONS') {
+        return res.status(204).end();
+      }
+      
+      // For CORS errors, return 403
+      return res.status(403).json({
+        success: false,
+        error: 'CORS error: Origin not allowed',
+        details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
+    }
 
-  const isJsonRequest =
-    req.xhr ||
-    req.headers.accept?.indexOf("json") !== -1 ||
-    req.path.startsWith("/api");
+    const statusCode = err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
 
-  if (isJsonRequest) {
-    res.status(statusCode).json({
-      success: false,
-      error: message,
-      stack: process.env.NODE_ENV === "development" ? err.stack : {},
-    });
+    const isJsonRequest =
+      req.xhr ||
+      req.headers.accept?.indexOf("json") !== -1 ||
+      req.path.startsWith("/api");
+
+    if (isJsonRequest) {
+      res.status(statusCode).json({
+        success: false,
+        error: message,
+        details: process.env.NODE_ENV === "development" ? err.stack : undefined
+      });
   } else {
     res.status(statusCode).send(`
       <html>

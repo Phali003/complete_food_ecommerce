@@ -262,11 +262,14 @@ const signup = async (req, res) => {
     // Generate token
     const token = generateToken(user);
 
-    // Set cookie
+    // Set cookie with improved settings for cross-origin authentication
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/',
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
     });
 
     // Return user data and token
@@ -341,11 +344,14 @@ const login = async (req, res) => {
     // Generate token
     const token = generateToken(user);
 
-    // Set cookie
+    // Set cookie with improved settings for cross-origin authentication
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      path: '/',
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
     });
 
     console.log('Successful login for user:', user.username);

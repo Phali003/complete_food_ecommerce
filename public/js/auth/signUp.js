@@ -376,24 +376,36 @@ document.addEventListener('DOMContentLoaded', () => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             },
             body: JSON.stringify(userData),
             credentials: 'include' // Important: include credentials for cookies
         })
         .then(async response => {
-            // Try to parse JSON regardless of content type
-            let data;
-            
-            try {
-                data = await response.json();
-            } catch (e) {
-                // If parsing fails, use text content
-                const text = await response.text();
-                data = { message: text || 'Unknown error occurred' };
+            // Check if the response is JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                return response.json().then(data => {
+                    // Return both the response status and data together
+                    return { status: response.status, data };
+                });
+            } else {
+                // If not JSON, handle text response
+                try {
+                    const text = await response.text();
+                    return { 
+                        status: response.status, 
+                        data: { message: text || 'Unknown error occurred' } 
+                    };
+                } catch (e) {
+                    // If all else fails
+                    return { 
+                        status: response.status, 
+                        data: { message: 'Unable to parse server response' } 
+                    };
+                }
             }
-            
-            return { status: response.status, data };
         })
         .then(result => {
             const { status, data } = result;
@@ -452,6 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         })
         .catch(error => {
+            console.error('Signup error:', error);
             // Network or parsing error
             // Handle connection issues
             
@@ -459,8 +472,24 @@ document.addEventListener('DOMContentLoaded', () => {
             signupButton.classList.remove('btn-loading');
             signupButton.disabled = false;
             
-            // Display generic error message
-            showAlert(signupAlert, 'Network error. Please try again later.', 'error');
+            // Display more specific error message based on error type
+            let errorMessage = 'Network error. Please try again later.';
+            
+            // Provide more specific error message if possible
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = 'Connection error. Please check your internet connection and try again.';
+            } else if (error.name === 'SyntaxError') {
+                errorMessage = 'Server returned an invalid response. Please try again later.';
+            } else if (error.name === 'AbortError') {
+                errorMessage = 'Request was cancelled. Please try again.';
+            } else if (error.name === 'TimeoutError' || error.message.includes('timeout')) {
+                errorMessage = 'Request timed out. The server may be busy, please try again later.';
+            } else if (error.message && error.message.includes('CORS')) {
+                errorMessage = 'Unable to connect to the server. CORS error. Please try again later.';
+            }
+            
+            // Display the error
+            showAlert(signupAlert, errorMessage, 'error');
             
             // Add shake animation to highlight error
             signupForm.classList.add('shake');

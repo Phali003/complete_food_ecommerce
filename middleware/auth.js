@@ -6,11 +6,19 @@ const protect = async (req, res, next) => {
   try {
     let token;
 
+    console.log('Auth middleware running with headers:', {
+      authorization: req.headers.authorization ? 'Present' : 'Not present',
+      cookies: req.cookies ? 'Present' : 'Not present',
+      cookieHeader: req.headers.cookie ? 'Present' : 'Not present'
+    });
+
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
+      console.log('Using token from Authorization header');
     } 
     else if (req.cookies && req.cookies.token) {
       token = req.cookies.token;
+      console.log('Using token from cookies');
     }
 
     if (!token) {

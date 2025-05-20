@@ -1,4 +1,4 @@
-const { login } = require('../auth/auth');
+const { login } = require('../../controllers/authController');
 
 /**
  * API route for user login

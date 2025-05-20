@@ -261,13 +261,23 @@ const signup = async (req, res) => {
     // Generate token
     const token = generateToken(user);
 
-    // Set cookie with consistent secure settings
+    // Set cookie with improved settings for cross-origin authentication
     res.cookie('token', token, {
-      httpOnly: process.env.COOKIE_HTTP_ONLY === 'true',
-      secure: process.env.COOKIE_SECURE === 'true',
-      sameSite: process.env.COOKIE_SAME_SITE || 'strict',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      path: '/'
+      path: '/',
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
+    });
+
+    // Log cookie settings for debugging
+    console.log('Setting auth cookie on signup with config:', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined,
+      env: process.env.NODE_ENV
     });
 
     // Return user data and token
@@ -296,7 +306,15 @@ const signup = async (req, res) => {
  */
 const login = async (req, res) => {
   try {
-    console.log('Starting login process');
+    console.log('Starting login process with detailed logging');
+    console.log('Database config:', {
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      database: process.env.DB_NAME,
+      ssl: process.env.DB_SSL,
+      port: process.env.DB_PORT
+    });
+
     // Validate input data
     const { error } = validationSchemas.login.validate(req.body);
     if (error) {
@@ -310,15 +328,19 @@ const login = async (req, res) => {
     const { identifier, password } = req.body;
     console.log('Login attempt with identifier:', identifier);
 
-    // Find user by email or username
+    // Find user by email or username with specific error handling
     let user = null;
-    // Check if identifier is email
-    if (identifier.includes('@')) {
-      console.log('Attempting login with email');
-      user = await UserModel.findByEmail(identifier);
-    } else {
-      console.log('Attempting login with username');
-      user = await UserModel.findByUsername(identifier);
+    try {
+      if (identifier.includes('@')) {
+        console.log('Attempting login with email');
+        user = await UserModel.findByEmail(identifier);
+      } else {
+        console.log('Attempting login with username');
+        user = await UserModel.findByUsername(identifier);
+      }
+    } catch (dbError) {
+      console.error('Database error during user lookup:', dbError);
+      throw new Error('Database error during authentication');
     }
 
     if (!user) {
@@ -329,8 +351,21 @@ const login = async (req, res) => {
       });
     }
 
-    // Verify password
-    const isPasswordValid = await UserModel.verifyPassword(password, user.password_hash);
+    console.log('User found:', {
+      id: user.id,
+      username: user.username,
+      hasPassword: !!user.password_hash
+    });
+
+    // Verify password with specific error handling
+    let isPasswordValid = false;
+    try {
+      isPasswordValid = await UserModel.verifyPassword(password, user.password_hash);
+    } catch (pwError) {
+      console.error('Password verification error:', pwError);
+      throw new Error('Error verifying credentials');
+    }
+
     if (!isPasswordValid) {
       console.log('Invalid password for user:', user.username);
       return res.status(401).json({
@@ -342,18 +377,33 @@ const login = async (req, res) => {
     // Generate token
     const token = generateToken(user);
 
-    // Set cookie with consistent secure settings
-    res.cookie('token', token, {
-      httpOnly: process.env.COOKIE_HTTP_ONLY === 'true',
-      secure: process.env.COOKIE_SECURE === 'true',
-      sameSite: process.env.COOKIE_SAME_SITE || 'strict',
-      maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      path: '/'
-    });
+      // Set cookie with improved settings for cross-origin authentication
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours
+        path: '/',
+        domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
+      });
+
+      // Log cookie settings for debugging
+      console.log('Setting auth cookie with config:', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined,
+        env: process.env.NODE_ENV
+      });
 
     console.log('Successful login for user:', user.username);
+    console.log('Cookie settings:', {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
+    });
 
-    // Return user data, token, and redirectUrl
+    // Return user data and token
     return res.status(200).json({
       success: true,
       message: 'Logged in successfully',
@@ -364,13 +414,26 @@ const login = async (req, res) => {
           email: user.email,
           role: user.role
         },
-        token,
-        redirectUrl: 'index.html'  // Added redirectUrl for client-side redirection
+        token
       }
     });
   } catch (error) {
     console.error('Login error:', error);
-    return handleError(res, error, 'Server error during login');
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      errno: error.errno,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage
+    });
+    
+    // Return a specific status code and message based on the error
+    return res.status(500).json({
+      success: false,
+      message: 'Server error during login',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
