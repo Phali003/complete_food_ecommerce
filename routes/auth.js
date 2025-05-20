@@ -119,102 +119,195 @@ router.post('/forgot-password', async (req, res) => {
         message: 'Email is required'
       });
     }
+    
+    // Pre-validate email configuration
+    const requiredEmailConfigs = [
+      'EMAIL_HOST', 
+      'EMAIL_PORT', 
+      'EMAIL_USER', 
+      'EMAIL_PASSWORD'
+    ];
+    
+    const missingConfigs = requiredEmailConfigs.filter(config => !process.env[config]);
+    if (missingConfigs.length > 0) {
+      console.error('Missing email configuration:', missingConfigs);
+      return res.status(500).json({
+        success: false,
+        message: 'Email service is not properly configured. Please contact support.'
+      });
+    }
+
+    // Validate EMAIL_DOMAIN (needed for CORS and proper email link generation)
+    if (!process.env.EMAIL_DOMAIN) {
+      console.warn('EMAIL_DOMAIN environment variable is not set. Using fallback domain from request.');
+      // We'll continue but log this warning
+    }
 
     // 1. Find user
     console.log('Finding user...');
-    const [rows] = await newPool.execute(
-      'SELECT id, username, email FROM users WHERE email = ?',
-      [email]
-    );
-    console.log('Database query results:', { found: rows.length > 0 });
-
-    // Check if user exists and return appropriate response
-    if (!rows || rows.length === 0) {
-      // Email doesn't exist in the system
-      return res.status(404).json({
-        success: false,
-        message: 'No account found with this email address'
-      });
-    }
-
-    // 2. User exists, generate and store token
-    const user = rows[0];
-    console.log('Found user:', { id: user.id, username: user.username });
-    
-    // Generate token
-    resetToken = crypto.randomBytes(20).toString('hex');
-    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
-    console.log('Token generated:', resetToken);
-
-    // Update user with reset token
-    console.log('Updating user with reset token...');
-    await newPool.execute(
-      'UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?',
-      [resetToken, resetTokenExpiry, user.id]
-    );
-
-    // Verify token storage
-    console.log('Verifying token storage...');
-    const [verifyResult] = await newPool.execute(
-      'SELECT reset_token, reset_token_expiry FROM users WHERE id = ?',
-      [user.id]
-    );
-    console.log('Token verification:', verifyResult[0]);
-
-    // Create reset URL
-    const resetUrl = `${req.protocol}://${req.get('host')}/reset-password.html?token=${resetToken}`;
-    
     try {
-      console.log('Configuring email transport...');
-      const transporter = nodemailer.createTransport({
-        host: process.env.EMAIL_HOST,
-        port: parseInt(process.env.EMAIL_PORT),
-        secure: process.env.EMAIL_SECURE === 'true',
-        auth: {
-          user: process.env.EMAIL_USER,
-          pass: process.env.EMAIL_PASSWORD
+      const [rows] = await newPool.execute(
+        'SELECT id, username, email FROM users WHERE email = ?',
+        [email]
+      );
+      console.log('Database query results:', { found: rows.length > 0 });
+
+      // Check if user exists and return appropriate response
+      if (!rows || rows.length === 0) {
+        // Email doesn't exist in the system
+        return res.status(404).json({
+          success: false,
+          message: 'No account found with this email address'
+        });
+      }
+
+      // 2. User exists, generate and store token
+      const user = rows[0];
+      console.log('Found user:', { id: user.id, username: user.username });
+      
+      // Generate token
+      resetToken = crypto.randomBytes(20).toString('hex');
+      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
+      console.log('Token generated with expiry:', resetTokenExpiry);
+
+      try {
+        // Update user with reset token
+        console.log('Updating user with reset token...');
+        await newPool.execute(
+          'UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE id = ?',
+          [resetToken, resetTokenExpiry, user.id]
+        );
+
+        // Verify token storage
+        console.log('Verifying token storage...');
+        const [verifyResult] = await newPool.execute(
+          'SELECT reset_token, reset_token_expiry FROM users WHERE id = ?',
+          [user.id]
+        );
+        console.log('Token verification result:', {
+          token_stored: verifyResult[0].reset_token === resetToken,
+          expiry_valid: new Date(verifyResult[0].reset_token_expiry) > new Date()
+        });
+
+        // Determine domain to use (prefer EMAIL_DOMAIN env var, fallback to request host)
+        const domain = process.env.EMAIL_DOMAIN || `${req.protocol}://${req.get('host')}`;
+        console.log('Using domain for reset URL:', domain);
+        
+        // Create reset URL with the proper domain
+        const resetUrl = `${domain}/reset-password.html?token=${resetToken}`;
+
+        try {
+          // Test email configuration before attempting to send
+          console.log('Configuring and testing email transport...');
+          const transporter = nodemailer.createTransport({
+            host: process.env.EMAIL_HOST,
+            port: parseInt(process.env.EMAIL_PORT),
+            secure: process.env.EMAIL_SECURE === 'true',
+            auth: {
+              user: process.env.EMAIL_USER,
+              pass: process.env.EMAIL_PASSWORD
+            },
+            // Add connection timeout to detect issues faster
+            connectionTimeout: 10000 // 10 seconds
+          });
+
+          // Verify SMTP connection configuration
+          await transporter.verify().catch(err => {
+            console.error('SMTP verification failed:', err);
+            throw new Error(`SMTP configuration error: ${err.message}`);
+          });
+          
+          console.log('SMTP configuration verified successfully');
+
+          console.log('Sending password reset email to:', user.email);
+          console.log('Reset URL:', resetUrl);
+          
+          const mailOptions = {
+            from: `"Fresh Eats Market" <${process.env.EMAIL_USER}>`,
+            to: user.email,
+            subject: 'Password Reset Request',
+            html: `
+              <h1>Password Reset Request</h1>
+              <p>Hello ${user.username},</p>
+              <p>You requested to reset your password. Please click the link below to reset it:</p>
+              <a href="${resetUrl}">Reset Password</a>
+              <p>This link will expire in 1 hour.</p>
+              <p>If you didn't request this, please ignore this email.</p>
+            `,
+            // Include plain text alternative for better deliverability
+            text: `
+              Password Reset Request
+              
+              Hello ${user.username},
+              
+              You requested to reset your password. Please use the link below to reset it:
+              
+              ${resetUrl}
+              
+              This link will expire in 1 hour.
+              
+              If you didn't request this, please ignore this email.
+            `
+          };
+
+          const mailResult = await transporter.sendMail(mailOptions);
+          console.log('Email sent successfully:', {
+            messageId: mailResult.messageId,
+            response: mailResult.response
+          });
+        } catch (emailError) {
+          console.error('Email sending error details:', {
+            error: emailError.message,
+            stack: emailError.stack,
+            code: emailError.code,
+            command: emailError.command,
+            emailConfig: {
+              host: process.env.EMAIL_HOST,
+              port: process.env.EMAIL_PORT,
+              secure: process.env.EMAIL_SECURE,
+              user: process.env.EMAIL_USER ? '***PROVIDED***' : '***MISSING***'
+            }
+          });
+          
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to send reset email. Please try again later or contact support.',
+            error: process.env.NODE_ENV === 'development' ? emailError.message : undefined
+          });
         }
-      });
 
-      console.log('Sending password reset email...');
-      const mailResult = await transporter.sendMail({
-        from: `"Fresh Eats Market" <${process.env.EMAIL_USER}>`,
-        to: user.email,
-        subject: 'Password Reset Request',
-        html: `
-          <h1>Password Reset Request</h1>
-          <p>Hello ${user.username},</p>
-          <p>You requested to reset your password. Please click the link below to reset it:</p>
-          <a href="${resetUrl}">Reset Password</a>
-          <p>This link will expire in 1 hour.</p>
-          <p>If you didn't request this, please ignore this email.</p>
-        `
-      });
-      console.log('Email sent successfully:', mailResult.messageId);
-    } catch (emailError) {
-      console.error('Failed to send email:', emailError.message);
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to send reset email. Please try again later.'
-      });
+        // Return success for valid email with reset instructions sent
+        return res.status(200).json({
+          success: true,
+          message: 'Password reset instructions have been sent to your email',
+          // Only in development mode, return the token for testing
+          ...(process.env.NODE_ENV === 'development' ? {
+            resetToken: resetToken,
+            resetUrl: resetUrl
+          } : {})
+        });
+      } catch (dbError) {
+        console.error('Database error during token storage:', dbError);
+        throw new Error(`Database error: ${dbError.message}`);
+      }
+    } catch (dbError) {
+      console.error('Database error during user lookup:', dbError);
+      throw new Error(`Database error: ${dbError.message}`);
     }
-
-    // Return success for valid email with reset instructions sent
-    return res.status(200).json({
-      success: true,
-      message: 'Password reset instructions have been sent to your email',
-      // Only in development mode, return the token for testing
-      ...(process.env.NODE_ENV === 'development' ? {
-        resetToken: resetToken,
-        resetUrl: `${req.protocol}://${req.get('host')}/reset-password.html?token=${resetToken}`
-      } : {})
-    });
-
   } catch (error) {
-    console.error('Password reset error:', error);
+    console.error('Password reset error:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      errno: error.errno,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage,
+    });
+    
     return res.status(500).json({
       success: false,
-      message: 'Error processing password reset request'
+      message: 'Error processing password reset request. Please try again later.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   } finally {
     // Make sure to end the pool when done
