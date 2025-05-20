@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Checkout - Food Delivery</title>
+    <meta
+      name="description"
+      content="Complete your food order checkout process"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+    <link rel="stylesheet" href="../css/checkOut.formatted.css" />
+  </head>
+  <body>
+    <!-- Accessibility skip link -->
+    <a href="#main-content" class="skip-to-content">Skip to content</a>
+
+    <!-- Header -->
+    <!-- Header -->
+    <header class="site-header" role="banner">
+      <div class="logo-container">
+        <a href="../index.html" class="back-link">
+          <span class="logo-text"
+            ><i class="fas fa-utensils logo-icon"></i>Food<span
+              class="logo-accent"
+              >Delivery</span
+            ></span
+          >
+        </a>
+      </div>
+    </header>
+
+    <!-- Progress indicator -->
+    <nav class="checkout-progress" aria-label="Checkout progress" role="navigation">
+        <a href="../viewCart/viewCart.html" class="progress-step completed" aria-label="Go to cart page" title="View cart">
+            <div class="step-icon" aria-hidden="true">1</div>
+            <span class="step-label">Cart</span>
+        </a>
+        <a
+          href="checkOut.html"
+          class="progress-step active"
+          aria-label="Current page: Checkout information"
+          title="Complete checkout"
+          aria-current="page"
+        >
+          <div class="step-icon" aria-hidden="true">2</div>
+          <span class="step-label">Checkout</span>
+        </a>
+        <a
+          href="../confirmation/confirm.html"
+          class="progress-step disabled tooltip"
+          id="confirmation-step"
+          aria-label="Complete checkout first"
+          title="Order confirmation"
+        >
+          <div class="step-icon" aria-hidden="true">3</div>
+          <span class="step-label">Confirmation</span>
+          <div class="tooltip-content">
+            Complete checkout first to access the confirmation page
+          </div>
+        </a>
+      </nav>
+
+      <h1 class="headLine">Checkout Your Order</h1>
+
+      <!-- Order summary section -->
+      <div class="order-summary">
+        <div class="cart-summary-headers">
+          <span class="product-header">Product</span>
+          <span class="price-header">Price</span>
+          <span class="quantity-header">Quantity</span>
+          <span class="total-header">Total</span>
+        </div>
+
+        <ul
+          id="checkOutList"
+          class="checkout-items-list"
+          aria-label="Order items"
+        ></ul>
+
+        <div class="checkout-totals" aria-live="polite">
+          <div class="subtotal">
+            <span>Subtotal:</span>
+            <span id="subtotalAmount">$0.00</span>
+          </div>
+          <div class="tax">
+            <span>Tax (7%):</span>
+            <span id="taxAmount">$0.00</span>
+          </div>
+          <div class="total">
+            <span>Total:</span>
+            <span id="totalAmount">$0.00</span>
+          </div>
+        </div>
+      </div>
+      <p class="welcomeMessage">
+        Welcome! We're excited to help you with your order. To ensure a smooth
+        and efficient process, please provide us with the following details:
+      </p>
+
+      <!-- Customer Information Form -->
+      <form id="checkout-form">
+        <section>
+          <h2 class="userInfo">Customer Information</h2>
+
+          <div class="container">
+            <input
+              required
+              type="text"
+              name="fullname"
+              class="input"
+              id="signInUsername"
+              placeholder=" "
+              aria-required="true"
+              aria-label="Enter your full name (first and last name)"
+              autocomplete="name"
+              minlength="5"
+              pattern="[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s'-]*[A-Za-zÀ-ÿ]"
+              title="Please enter your full name (first and last name)"
+            />
+            <label class="label" for="signInUsername">Full Name</label>
+            <div class="error-message" id="username-error">
+              Please enter your first and last name
+            </div>
+          </div>
+
+          <div class="container">
+            <input
+              required
+              type="email"
+              name="email"
+              class="input"
+              id="signInEmail"
+              placeholder=" "
+              aria-required="true"
+            />
+            <label class="label" for="signInEmail">Email</label>
+            <div class="error-message" id="email-error">
+              Please enter a valid email address
+            </div>
+          </div>
+
+          <div class="container">
+            <input
+              required
+              type="tel"
+              name="phone"
+              class="input"
+              id="phoneNumber"
+              placeholder=" "
+              pattern="[0-9]{10,}"
+              aria-required="true"
+            />
+            <label class="label" for="phoneNumber">Phone Number</label>
+            <div class="error-message" id="phone-error">
+              Please enter a valid phone number
+            </div>
+          </div>
+
+          <div class="container">
+            <input
+              required
+              type="text"
+              name="address"
+              class="input"
+              id="address"
+              placeholder=" "
+              aria-required="true"
+            />
+            <label class="label" for="address">Street Address</label>
+            <div class="error-message" id="address-error">
+              Please enter your street address
+            </div>
+          </div>
+
+          <div class="container">
+            <input
+              required
+              type="text"
+              name="city"
+              class="input"
+              id="city"
+              placeholder=" "
+              aria-required="true"
+            />
+            <label class="label" for="city">City</label>
+            <div class="error-message" id="city-error">
+              Please enter your city
+            </div>
+          </div>
+
+          <div class="container">
+            <input
+              required
+              type="text"
+              name="country"
+              class="input"
+              id="country"
+              placeholder=" "
+              aria-required="true"
+            />
+            <label class="label" for="country">Country</label>
+            <div class="error-message" id="country-error">
+              Please enter your country
+            </div>
+          </div>
+        </section>
+
+        <!-- Payment Information Section -->
+        <h2 class="Payment-Details">Payment Details</h2>
+
+        <!-- Payment Method Selection -->
+        <div
+          class="payment-methods"
+          role="radiogroup"
+          aria-labelledby="payment-method-heading"
+          style="position: relative;"
+        >
+          <h3 id="payment-method-heading" class="visually-hidden">
+            Select Payment Method
+          </h3>
+
+          <div
+            class="payment-method selected"
+            tabindex="0"
+            role="radio"
+            aria-checked="true"
+            data-payment-method="credit-card"
+          >
+            <i
+              class="fa-solid fa-credit-card payment-method-icon"
+              aria-hidden="true"
+            ></i>
+            <span>Credit Card</span>
+          </div>
+
+          <div
+            class="payment-method"
+            tabindex="0"
+            role="radio"
+            aria-checked="false"
+            data-payment-method="paypal"
+          >
+            <i
+              class="fa-brands fa-paypal payment-method-icon"
+              aria-hidden="true"
+            ></i>
+            <span>PayPal</span>
+          </div>
+
+          <div
+            class="payment-method"
+            tabindex="0"
+            role="radio"
+            aria-checked="false"
+            data-payment-method="cash"
+          >
+            <i
+              class="fa-solid fa-money-bill-wave payment-method-icon"
+              aria-hidden="true"
+            ></i>
+            <span>Cash on Delivery</span>
+          </div>
+
+          <div
+            class="payment-method"
+            tabindex="0"
+            role="radio"
+            aria-checked="false"
+            data-payment-method="bank-transfer"
+          >
+            <i
+              class="fa-solid fa-building-columns payment-method-icon"
+              aria-hidden="true"
+            ></i>
+            <span>Bank Transfer</span>
+          </div>
+        </div>
+
+        <div class="card-details">
+          <div class="container">
+            <label class="Card-Name" for="nameInput">Cardholder's Name</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-user" aria-hidden="true"></i>
+              <input
+                type="text"
+                class="nameInput"
+                placeholder="Your Name"
+                id="nameInput"
+                required
+                aria-required="true"
+              />
+            </div>
+            <div class="error-message" id="card-name-error">
+              Please enter the cardholder's name
+            </div>
+          </div>
+
+          <div class="container">
+            <label class="Card-Number" for="numberInput">Card Number</label>
+            <div class="input-wrapper">
+              <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
+              <input
+                type="text"
+                class="numberInput"
+                placeholder="XXXX XXXX XXXX XXXX"
+                id="numberInput"
+                required
+                pattern="[0-9\s]{13,19}"
+                maxlength="19"
+                aria-required="true"
+                inputmode="numeric"
+                aria-label="Card number - enter 16 digits"
+                autocomplete="cc-number"
+              />
+            </div>
+            <div class="error-message" id="card-number-error">
+              Please enter a valid card number
+            </div>
+          </div>
+
+          <div class="card-expiry-cvc">
+            <div class="container half-width">
+              <label for="expiryDate">Expiry Date</label>
+              <input
+                type="text"
+                class="input"
+                id="expiryDate"
+                placeholder="MM/YY"
+                required
+                pattern="(0[1-9]|1[0-2])\/[0-9]{2}"
+                maxlength="5"
+                aria-required="true"
+              />
+              <div class="error-message" id="expiry-error">
+                Please enter a valid date
+              </div>
+            </div>
+
+            <div class="container half-width">
+              <label for="cvc">CVC/CVV</label>
+              <input
+                type="text"
+                class="input"
+                id="cvc"
+                placeholder="123"
+                required
+                pattern="[0-9]{3,4}"
+                maxlength="4"
+                aria-required="true"
+              />
+              <div class="error-message" id="cvc-error">
+                Please enter your CVC
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="placeOrder" id="placeOrderBtn">
+          <span class="loading-spinner" aria-hidden="true"></span>
+          <span class="button-text">Place Order</span>
+        </button>
+      </form>
+
+      <p class="welcomeMessage">
+        Rest assured, your information is safe with us. We value your privacy
+        and are committed to protecting your personal data. Thank you for
+        choosing our food delivery service!
+      </p>
+
+      <!-- Notification System -->
+      <div
+        class="notification success hidden preload"
+        id="success-notification"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-hidden="true"
+        style="
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          position: absolute !important;
+          top: -9999px !important;
+          left: -9999px !important;
+        "
+      >
+        <div class="notification-icon">
+          <i class="fas fa-check-circle" aria-hidden="true"></i>
+        </div>
+        <div class="notification-content">
+          <h3 class="notification-title">Success!</h3>
+          <p class="notification-message">
+            Your order has been placed successfully.
+          </p>
+        </div>
+        <button class="notification-close" aria-label="Close notification">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <div
+        class="notification error hidden preload"
+        id="error-notification"
+        aria-live="assertive"
+        aria-atomic="true"
+        aria-hidden="true"
+        style="
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          position: absolute !important;
+          top: -9999px !important;
+          left: -9999px !important;
+        "
+      >
+        <div class="notification-icon">
+          <i class="fas fa-exclamation-circle" aria-hidden="true"></i>
+        </div>
+        <div class="notification-content">
+          <h3 class="notification-title">Error</h3>
+          <p class="notification-message">
+            There was a problem processing your order. Please try again.
+          </p>
+        </div>
+        <button class="notification-close" aria-label="Close notification">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="footer-container">
+        <div class="footer-section">
+          <h3>Food Delivery</h3>
+          <p>Bringing delicious meals right to your doorstep.</p>
+        </div>
+        <div class="footer-section">
+          <h3>Contact Us</h3>
+            <a href="#" aria-label="Twitter"
+              ><i class="fab fa-twitter" aria-hidden="true"></i
+            ></a>
+            <a href="#" aria-label="Instagram"
+              ><i class="fab fa-instagram" aria-hidden="true"></i
+            ></a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2025 Food Delivery. All rights reserved.</p>
+      </div>
+    </footer>
+    <script>
+      // Immediately ensure notifications are completely hidden before any other JS runs
+      document.addEventListener("DOMContentLoaded", function () {
+        // Remove the preload class after a short delay to enable transitions after page load
+        setTimeout(function () {
+          document
+            .querySelectorAll(".notification.preload")
+            .forEach(function (notification) {
+              notification.classList.remove("preload");
+            });
+        }, 300);
+      });
+    </script>
+    <script src="../js/checkOut.js"></script>
+  </body>
+</html>

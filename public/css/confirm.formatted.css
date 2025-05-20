@@ -1,0 +1,34 @@
+/* confirm.css styles - Main stylesheet */
+
+/* Base reset and default styles */
+/* Responsive design breakpoints */
+body {
+  background-color: aqua;
+}
+@media print {
+  body {
+    background-color: #fff;
+    color: #000 !important;
+    margin: 0;
+    padding: 20px;
+    text-shadow: none !important;
+  }
+  .action-buttons,
+  .checkout-progress,
+  .notification,
+  .site-footer,
+  .site-header,
+  .skip-to-content {
+    display: none !important;
+  }
+  .order-confirmation {
+    padding: 20px;
+  }
+  .order-details {
+    margin-bottom: 20px;
+    page-break-inside: avoid;
+  }
+  .tracking-info {
+    page-break-before: always;
+  }
+}

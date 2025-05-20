@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const jwt = require('jsonwebtoken');
-const { pool } = require('../config/database');
+const pool = require('../api/config/database');
 
 /**
  * Middleware to authenticate JWT token
@@ -90,32 +90,32 @@ const checkAdminExists = async () => {
 
 // Home page
 router.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/index.html'));
+  res.sendFile(path.join(__dirname, '../index.html'));
 });
 
 // Login page
 router.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/login.html'));
+  res.sendFile(path.join(__dirname, '../Signing/login.html'));
 });
 
 // Signup page
 router.get('/signup', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/signup.html'));
+  res.sendFile(path.join(__dirname, '../Signing/signup.html'));
 });
 
 // Admin Setup page
 router.get('/admin-setup', async (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/admin-setup.html'));
+  res.sendFile(path.join(__dirname, '../admin/admin-setup.html'));
 });
 
 // Admin dashboard page (protected route, should be handled with middleware)
 router.get('/admin/dashboard', authenticateToken, isAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/admin/dashboard.html'));
+  res.sendFile(path.join(__dirname, '../admin/dashboard.html'));
 });
 
 // User dashboard page (protected route)
 router.get('/user/dashboard', authenticateToken, (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/user/dashboard.html'));
+  res.sendFile(path.join(__dirname, '../user/dashboard.html'));
 });
 
 // Check admin existence API endpoint
@@ -134,12 +134,12 @@ router.get('/api/auth/check-admin-exists', async (req, res) => {
 
 // Unauthorized access page
 router.get('/unauthorized', (req, res) => {
-  res.sendFile(path.join(__dirname, '../public/unauthorized.html'));
+  res.sendFile(path.join(__dirname, '../error/unauthorized.html'));
 });
 
 // Not Found handler - must be registered at the end
 router.use((req, res) => {
-  res.status(404).sendFile(path.join(__dirname, '../public/404.html'));
+  res.status(404).sendFile(path.join(__dirname, '../error/404.html'));
 });
 
 // Module exports

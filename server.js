@@ -4,15 +4,22 @@ const path = require("path");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const helmet = require("helmet");
+const fs = require("fs");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
 
+// Check for email domain configuration
+if (!process.env.EMAIL_DOMAIN && process.env.NODE_ENV === 'production') {
+  console.warn('EMAIL_DOMAIN environment variable is not set. This may cause CORS issues with email links.');
+}
+
 // Import routes and database connection after setting DEBUG_URL
-const { testConnection } = require("./config/database");
+const { testConnection } = require("./config/database.js");
 const authRoutes = require("./routes/auth");
-const pagesRoutes = require("./routes/pages");
-const productRoutes = require("./routes/products");
-const cartRoutes = require("./routes/cart");
+const productRoutes = require("./api/products/products");
+const cartRoutes = require("./api/cart/cart");
+const adminRoutes = require("./api/admin/admin");
+const { protect } = require("./middleware/auth");
 const ejs = require("ejs");
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -26,9 +33,26 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/"],
-        imgSrc: ["'self'", "data:"],
+        scriptSrc: [
+          "'self'", 
+          "'unsafe-inline'", 
+          "https://code.jquery.com",
+          "https://cdn.jsdelivr.net",
+          "https://cdnjs.cloudflare.com",
+          "https://ka-f.fontawesome.com"
+        ],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "https://cdnjs.cloudflare.com",
+          "https://cdn.jsdelivr.net"
+        ],
+        imgSrc: ["'self'", "data:", "https:", "*"],
+        fontSrc: ["'self'", "https://cdnjs.cloudflare.com", "data:", "*"],
+        connectSrc: ["'self'", "https://ka-f.fontawesome.com", "ws:", "wss:", "*"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
       },
     },
   })
@@ -49,11 +73,26 @@ if (process.env.NODE_ENV === "production") {
 
 app.use(
   cors({
-    origin:
-      process.env.NODE_ENV === "production"
-        ? process.env.FRONTEND_URL
-        : "http://localhost:3000",
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        'http://localhost:3000',
+        // Add any additional domains that might be used in email links
+        process.env.EMAIL_DOMAIN
+      ].filter(Boolean); // Remove any undefined values
+      
+      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
   })
 );
 app.use(express.json());
@@ -61,47 +100,27 @@ app.use(express.urlencoded({ extended: true }));
 
 // Configure secure cookie settings
 const cookieConfig = {
-  httpOnly: process.env.COOKIE_HTTP_ONLY === 'true',
-  secure: process.env.COOKIE_SECURE === 'true', 
-  sameSite: process.env.COOKIE_SAME_SITE || 'strict',
+  httpOnly: process.env.COOKIE_HTTP_ONLY === "true",
+  secure: process.env.COOKIE_SECURE === "true",
+  sameSite: process.env.COOKIE_SAME_SITE || "strict",
   maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 86400000, // 24 hours in milliseconds
   signed: true,
-  path: '/'
+  path: "/",
 };
 
 // JWT Configuration
 const jwtConfig = {
   secret: process.env.JWT_SECRET,
   options: {
-    expiresIn: process.env.JWT_EXPIRES_IN || '24h',
-    algorithm: 'HS256'
-  }
+    expiresIn: process.env.JWT_EXPIRES_IN || "24h",
+    algorithm: "HS256",
+  },
 };
 
 // Initialize cookie-parser with the secure cookie secret
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
-// JWT verification middleware
-const verifyToken = (req, res, next) => {
-  try {
-    const token = req.cookies.jwt || req.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-
-    jwt.verify(token, jwtConfig.secret, (err, decoded) => {
-      if (err) {
-        return res.status(401).json({ message: 'Invalid or expired token' });
-      }
-      req.user = decoded;
-      next();
-    });
-  } catch (error) {
-    console.error('Authentication error:', error);
-    return res.status(401).json({ message: 'Authentication failed' });
-  }
-};
+// Note: JWT verification is now handled by middleware/auth.js with the protect middleware
 
 // Helper function to set secure cookies
 app.use((req, res, next) => {
@@ -111,16 +130,69 @@ app.use((req, res, next) => {
   next();
 });
 
-// Static files
-app.use(express.static(path.join(__dirname, "public")));
-app.use('/src/components', express.static(path.join(__dirname, 'src/components')));
-app.use("/css", express.static(path.join(__dirname, "css")));
-app.use("/assets", express.static(path.join(__dirname, "Assets")));
-app.use("/viewcart", express.static(path.join(__dirname, "viewCart")));
-app.use("/checkout", express.static(path.join(__dirname, "checkOut")));
-app.use("/signing", express.static(path.join(__dirname, "Signing")));
-app.use("/aboutus", express.static(path.join(__dirname, "aboutUs")));
-app.use("/confirmation", express.static(path.join(__dirname, "confirmation")));
+// Static files with enhanced configuration
+const staticOptions = {
+  setHeaders: (res, filePath, stat) => {
+    // Set CORS headers for static files
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Add Vary header to help with caching
+    res.set('Vary', 'Origin');
+
+    // Different cache settings based on file type
+    if (filePath.endsWith('.html')) {
+      // Don't cache HTML files
+      res.set({
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+    } else if (filePath.includes('/css/') || filePath.includes('/js/')) {
+      // Allow CSS and JS files to be cached but must revalidate
+      res.set('Cache-Control', 'public, max-age=0, must-revalidate');
+    } else if (filePath.includes('/assets/')) {
+      // Long cache for assets
+      res.set('Cache-Control', 'public, max-age=2592000'); // 30 days
+    } else {
+      // Default caching policy
+      res.set('Cache-Control', 'public, max-age=86400'); // 1 day
+    }
+
+    // Set security headers for all static files
+    res.set({
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block'
+    });
+  },
+  // Ensure proper MIME types
+  setMimeTypes: {
+    'text/css': ['css'],
+    'text/javascript': ['js'],
+    'text/html': ['html']
+  },
+  // Don't serve hidden files
+  dotfiles: 'ignore'
+};
+
+// Main static file middleware
+app.use(express.static(path.join(__dirname, "public"), staticOptions));
+
+// Specific routes with the same options
+app.use("/js", express.static(path.join(__dirname, "public/js"), staticOptions));
+app.use("/css", express.static(path.join(__dirname, "public/css"), staticOptions));
+app.use("/assets", express.static(path.join(__dirname, "public/assets"), staticOptions));
+app.use(
+  "/assets/myImages",
+  express.static(path.join(__dirname, "public/assets/myImages"), staticOptions)
+);
+app.use(
+  "/components",
+  express.static(path.join(__dirname, "public/components"))
+);
+app.use("/pages", express.static(path.join(__dirname, "public/pages")));
 
 app.use((req, res, next) => {
   if (req.url.startsWith("/api")) return next();
@@ -167,38 +239,114 @@ app.use((req, res, next) => {
 
 // Keep the existing routes
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  res.sendFile(path.join(__dirname, "public/index.html"));
 });
 
 // API routes
 app.use("/api/auth", authRoutes);
-app.use("/api/products", verifyToken, productRoutes);
-app.use("/api/cart", verifyToken, cartRoutes);
+app.use("/api/products", protect, productRoutes);
+app.use("/api/cart", protect, cartRoutes);
 
 // Page routes
 app.get("/view-cart", (req, res) => {
-  res.sendFile(path.join(__dirname, "viewCart/viewCart.html"));
+  res.sendFile(path.join(__dirname, "public/viewCart/viewCart.html"));
 });
 
 app.get("/checkout", (req, res) => {
-  res.sendFile(path.join(__dirname, "checkOut/checkOut.html"));
+  res.sendFile(path.join(__dirname, "public/checkOut/checkOut.html"));
 });
 
 app.get("/about-us", (req, res) => {
-  res.sendFile(path.join(__dirname, "aboutUs/aboutUs.html"));
+  res.sendFile(path.join(__dirname, "public/aboutUs/aboutUs.html"));
 });
 
 app.get("/confirm", (req, res) => {
-  res.sendFile(path.join(__dirname, "confirmation/confirm.html"));
+  res.sendFile(path.join(__dirname, "public/confirmation/confirm.html"));
 });
 
 // Additional route for browsing products can redirect to home
 app.get("/browse-products", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  res.sendFile(path.join(__dirname, "public/index.html"));
 });
 
-// Simple pagesRoutes (non-API) at the end
-app.use("/", pagesRoutes);
+// Authentication page routes
+app.get("/forgot-password", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/forgot-password.html"));
+});
+
+// Update the reset-password.html route handler
+app.get("/reset-password.html", (req, res) => {
+  const token = req.query.token;
+  
+  // Validate token presence and basic format
+  if (!token || token.length < 20) {  // Changed from strict hex validation
+    console.warn('Invalid token detected:', token ? 'Invalid length' : 'Missing token');
+    return res.redirect('/forgot-password.html');
+  }
+  
+  // Just serve the HTML file with the base URL and token
+  fs.readFile(path.join(__dirname, "public/reset-password.html"), 'utf8', (err, html) => {
+    if (err) {
+      console.error('Error reading reset-password.html:', err);
+      return res.status(500).send('Internal Server Error');
+    }
+
+    // Construct the base URL
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const baseUrl = `${protocol}://${host}`;
+
+    // Extra token sanitization
+    const sanitizedToken = token
+      .replace(/[<>'"]/g, '') // Remove potentially dangerous characters
+      .trim();
+
+    // Debug the token before injection
+    console.log('Token debug:', {
+      originalLength: token.length,
+      sanitizedLength: sanitizedToken.length,
+      baseUrl: baseUrl
+    });
+
+    // Update the token injection with modified script
+    const modifiedHtml = html.replace(
+      '</head>',
+      `<script>
+        // Immediately set the token and base URL
+        (function() {
+            window.BASE_URL = "${baseUrl}";
+            window.RESET_TOKEN = "${sanitizedToken}";
+            
+            // Debug token set
+            console.log('Token set debug:', {
+                exists: typeof window.RESET_TOKEN === 'string',
+                length: window.RESET_TOKEN ? window.RESET_TOKEN.length : 0,
+                baseUrl: window.BASE_URL
+            });
+        })();
+      </script></head>`
+    );
+
+    // Set security headers
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Content-Type': 'text/html',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block'
+    });
+
+    res.send(modifiedHtml);
+  });
+});
+
+// Note: The actual password reset should only happen when the form is submitted via the API
+
+
+// Admin routes for pages and other admin functionalities
+app.use("/api/admin", protect, adminRoutes);
 
 // Very simple catch-all that doesn't try to parse URL patterns
 app.use((req, res, next) => {
@@ -220,7 +368,7 @@ app.use((req, res, next) => {
   }
 
   // Simple static file handling for index.html
-  res.sendFile(path.join(__dirname, "index.html"), (err) => {
+  res.sendFile(path.join(__dirname, "public/index.html"), (err) => {
     if (err) {
       return res.status(404).send("Not found");
     }

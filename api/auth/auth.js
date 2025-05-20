@@ -6,14 +6,15 @@
 // --------------------------------------
 // Imports
 // --------------------------------------
-const UserModel = require('../models/UserModel');
-const BlacklistedTokenModel = require('../models/BlacklistedTokenModel');
-const { generateToken } = require('../utils/jwt');
+const express = require('express');
+const router = express.Router();
+const UserModel = require('../../models/UserModel');
+const { generateToken } = require('../../utils/jwt');
 const Joi = require('joi');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
-const { pool } = require('../config/database');
+const { pool } = require('../../config/database');
 
 // --------------------------------------
 // Database Helpers
@@ -261,13 +262,11 @@ const signup = async (req, res) => {
     // Generate token
     const token = generateToken(user);
 
-    // Set cookie with consistent secure settings
+    // Set cookie
     res.cookie('token', token, {
-      httpOnly: process.env.COOKIE_HTTP_ONLY === 'true',
-      secure: process.env.COOKIE_SECURE === 'true',
-      sameSite: process.env.COOKIE_SAME_SITE || 'strict',
-      maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      path: '/'
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
     // Return user data and token
@@ -342,13 +341,11 @@ const login = async (req, res) => {
     // Generate token
     const token = generateToken(user);
 
-    // Set cookie with consistent secure settings
+    // Set cookie
     res.cookie('token', token, {
-      httpOnly: process.env.COOKIE_HTTP_ONLY === 'true',
-      secure: process.env.COOKIE_SECURE === 'true',
-      sameSite: process.env.COOKIE_SAME_SITE || 'strict',
-      maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      path: '/'
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
     });
 
     console.log('Successful login for user:', user.username);
@@ -365,7 +362,7 @@ const login = async (req, res) => {
           role: user.role
         },
         token,
-        redirectUrl: 'index.html'  // Added redirectUrl for client-side redirection
+        redirectUrl: 'index.html'  // Add redirectUrl for client-side redirection
       }
     });
   } catch (error) {
@@ -377,20 +374,9 @@ const login = async (req, res) => {
 /**
  * User logout controller
  */
-const logout = async (req, res) => {
+const logout = (req, res) => {
   try {
     console.log('Processing logout request');
-    
-    // Get token from request
-    const token = req.cookies.token || 
-               (req.headers.authorization && req.headers.authorization.split(' ')[1]);
-    
-    // Blacklist the token if it exists and user is authenticated
-    if (token && req.user) {
-      await BlacklistedTokenModel.blacklistToken(token, req.user.id);
-      console.log(`Token blacklisted for user ID: ${req.user.id}`);
-    }
-    
     // Clear cookie
     res.clearCookie('token');
 
@@ -924,27 +910,28 @@ const getAdminDetails = async (req, res) => {
     }
 };
 
-// Export all controller methods
-module.exports = {
-  // User authentication
-  signup,
-  login,
-  logout,
-  getProfile,
-  
-  // Test endpoints
-  testSuccess,
-  testError,
-  testDatabase,
-  testCreateUser,
-  
-  // Admin management
-  setupInitialAdmin,
-  createAdmin,
-  listAdmins,
-  migrateAdmin,
-  updateAdminStatus,
-  getAdminDetails,
-  resetAdminPassword
-};
+// Setup route endpoints
+// User authentication routes
+router.post('/signup', signup);
+router.post('/login', login);
+router.post('/logout', logout);
+router.get('/profile', getProfile);
+
+// Test endpoints
+router.get('/test', testSuccess);
+router.get('/test-error', testError);
+router.get('/test-db', testDatabase);
+router.post('/test-create-user', testCreateUser);
+
+// Admin management routes
+router.post('/admin/setup', setupInitialAdmin);
+router.post('/admin/create', createAdmin);
+router.get('/admin/list', listAdmins);
+router.post('/admin/migrate', migrateAdmin);
+router.post('/admin/status', updateAdminStatus);
+router.get('/admin/details', getAdminDetails);
+router.post('/admin/reset-password', resetAdminPassword);
+
+// Export the router
+module.exports = router;
 

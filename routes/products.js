@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { pool } = require('../config/database');
+const pool = require('../config/database');
 const { protect, isAdmin } = require('../middleware/auth');
 
 // Debug middleware to log route access
