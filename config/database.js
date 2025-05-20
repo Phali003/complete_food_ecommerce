@@ -229,12 +229,17 @@ const startPoolMonitoring = () => {
   // Monitor pool status periodically
   setInterval(async () => {
     try {
-      const status = pool.pool ? {
-        threadId: pool.pool.threadId,
-        connectionLimit: pool.config.connectionLimit,
-        queueLimit: pool.config.queueLimit,
-        waitForConnections: pool.config.waitForConnections
-      } : 'Pool not initialized';
+      // Use async/await to check pool status
+      const status = await (async () => {
+        if (!pool.pool) return 'Pool not initialized';
+        
+        return {
+          threadId: pool.pool.threadId,
+          connectionLimit: pool.config.connectionLimit,
+          queueLimit: pool.config.queueLimit,
+          waitForConnections: pool.config.waitForConnections
+        };
+      })();
       
       console.log('Pool Status:', status);
     } catch (error) {
@@ -387,15 +392,18 @@ const verifyConnectionSecurity = async (connection) => {
     // Check SSL status with proper SQL syntax (using single quotes for SQL)
     const [sslStatus] = await connection.query("SHOW STATUS LIKE 'Ssl%'");
     
-    // Create SSL info object
-    const sslInfo = {};
-    if (sslStatus && Array.isArray(sslStatus)) {
-      sslStatus.forEach(row => {
-        if (row && row.Variable_name) {
-          sslInfo[row.Variable_name] = row.Value;
-        }
-      });
-    }
+    // Create SSL info object with proper Promise handling
+    const sslInfo = await Promise.resolve().then(() => {
+      const info = {};
+      if (sslStatus && Array.isArray(sslStatus)) {
+        sslStatus.forEach(row => {
+          if (row && row.Variable_name) {
+            info[row.Variable_name] = row.Value;
+          }
+        });
+      }
+      return info;
+    });
 
     // Enhanced cipher strength verification
     const isStrongCipher = (() => {
@@ -683,26 +691,24 @@ const query = async (sql, params) => {
   // Check if we're using mock database
   if (process.env.NODE_ENV === 'development' && process.env.MOCK_DB === 'true') {
     console.warn('MOCK DB: Query executed:', sql);
-    return []; // Return empty array as mock result
+    return Promise.resolve([]); // Return Promise for consistency
   }
   
   let connection = null;
   try {
-    // Test connection before executing the query
-    try {
-      connection = await pool.getConnection();
-      console.log('Pool connection acquired for query');
-      
-      // Verify SSL/TLS security for query connection
-      const isSecure = await verifyConnectionSecurity(connection);
-      if (!isSecure && process.env.DB_SSL === 'true') {
-        console.warn('Warning: Query connection may not be properly encrypted despite SSL being enabled');
-        // Continue execution but log the warning
-      }
-      
-    } catch (connError) {
+    // Get connection using Promise-based approach
+    connection = await pool.getConnection().catch(connError => {
       console.error('Connection acquisition failed:', connError);
       throw new Error(`Failed to get database connection: ${connError.message}`);
+    });
+    
+    console.log('Pool connection acquired for query');
+    
+    // Verify SSL/TLS security for query connection
+    const isSecure = await verifyConnectionSecurity(connection);
+    if (!isSecure && process.env.DB_SSL === 'true') {
+      console.warn('Warning: Query connection may not be properly encrypted despite SSL being enabled');
+      // Continue execution but log the warning
     }
     
     try {
@@ -722,23 +728,24 @@ const query = async (sql, params) => {
       params: JSON.stringify(params)
     });
     
-    // Now execute the query with direct error handling
-    try {
-      const [results] = await connection.execute(sql, params);
-      console.log('Query executed successfully, result count:', Array.isArray(results) ? results.length : 'non-array result');
-      return results;
-    } catch (execError) {
-      console.error('Query execution error:', {
-        message: execError.message,
-        code: execError.code,
-        errno: execError.errno,
-        sqlState: execError.sqlState,
-        sqlMessage: execError.sqlMessage,
-        sql: sql,
-        params: JSON.stringify(params)
+    // Now execute the query with direct error handling and cleaner Promise usage
+    return connection.execute(sql, params)
+      .then(([results]) => {
+        console.log('Query executed successfully, result count:', Array.isArray(results) ? results.length : 'non-array result');
+        return results;
+      })
+      .catch(execError => {
+        console.error('Query execution error:', {
+          message: execError.message,
+          code: execError.code,
+          errno: execError.errno,
+          sqlState: execError.sqlState,
+          sqlMessage: execError.sqlMessage,
+          sql: sql,
+          params: JSON.stringify(params)
+        });
+        throw execError;
       });
-      throw execError;
-    }
   } catch (error) {
     console.error('Database query failed:', {
       message: error.message,
@@ -769,22 +776,28 @@ const beginTransaction = async () => {
   // Check if we're using mock database
   if (process.env.NODE_ENV === 'development' && process.env.MOCK_DB === 'true') {
     console.warn('MOCK DB: Transaction started');
-    return { mockTransaction: true }; // Return mock connection object
+    return Promise.resolve({ mockTransaction: true }); // Return promise for consistency
   }
   
-  const connection = await pool.getConnection();
-  console.log('Pool connection acquired for transaction');
-  
-  // Verify SSL/TLS security for transaction connection
-  const isSecure = await verifyConnectionSecurity(connection);
-  if (!isSecure && process.env.DB_SSL === 'true') {
-    console.warn('Warning: Transaction connection may not be properly encrypted despite SSL being enabled');
-    // Continue with transaction but log the warning
+  try {
+    const connection = await pool.getConnection();
+    console.log('Pool connection acquired for transaction');
+    
+    // Verify SSL/TLS security for transaction connection
+    const isSecure = await verifyConnectionSecurity(connection);
+    if (!isSecure && process.env.DB_SSL === 'true') {
+      console.warn('Warning: Transaction connection may not be properly encrypted despite SSL being enabled');
+      // Continue with transaction but log the warning
+    }
+    
+    // Begin transaction with proper promise handling
+    await connection.beginTransaction();
+    console.log('Transaction started successfully');
+    return connection;
+  } catch (error) {
+    console.error('Failed to begin transaction:', error);
+    throw error; // Re-throw to allow handling by caller
   }
-  
-  await connection.beginTransaction();
-  console.log('Transaction started successfully');
-  return connection;
 };
 
 // Commit transaction
@@ -977,26 +990,24 @@ const directQuery = async (sql, params) => {
 // Define execute method for backward compatibility
 const execute = async (sql, params) => {
   console.log('Using execute method (wraps query)');
-  let result;
-  try {
-    result = await query(sql, params);
-  } catch (error) {
-    console.error('Execute wrapper error:', {
-      message: error.message,
-      code: error.code,
-      errno: error.errno,
-      sqlState: error.sqlState,
-      sqlMessage: error.sqlMessage,
-      sql: sql,
-      params: JSON.stringify(params)
+  // Use cleaner promise handling
+  return query(sql, params)
+    .catch(error => {
+      console.error('Execute wrapper error:', {
+        message: error.message,
+        code: error.code,
+        errno: error.errno,
+        sqlState: error.sqlState,
+        sqlMessage: error.sqlMessage,
+        sql: sql,
+        params: JSON.stringify(params)
+      });
+      
+      // Handle SSL-related errors in execute wrapper
+      handleSSLError(error);
+      
+      throw error; // Re-throw to allow handling by caller
     });
-    
-    // Handle SSL-related errors in execute wrapper
-    handleSSLError(error);
-    
-    throw error;
-  }
-  return result;
 };
 
 // Add directQuery to the pool object for direct access
