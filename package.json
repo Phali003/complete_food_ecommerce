@@ -37,6 +37,9 @@
     "url": "https://github.com/Phali003/Food-Ecommerce/issues"
   },
   "homepage": "https://github.com/Phali003/Food-Ecommerce#readme",
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "@sendgrid/mail": "^8.1.5",
     "bcryptjs": "^2.4.3",
