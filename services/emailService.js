@@ -3,8 +3,11 @@
  * Handles email sending using Resend.com
  */
 
-const { Resend } = require('resend');
-require('dotenv').config();
+import { Resend } from 'resend';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Initialize Resend with API key
 let resend = null;
@@ -199,74 +202,147 @@ async function sendTestEmail(testEmail) {
 /**
  * Send a password reset email
  * @param {Object} options - Password reset options
- * @param {string} options.to - Recipient email address
- * @param {string} options.resetToken - Password reset token
- * @param {string} options.resetUrl - Base URL for password reset
+ * @param {string} options.email - Recipient email address
+ * @param {string} options.username - User's username (optional)
+ * @param {string} options.resetUrl - Complete reset URL with token
  * @returns {Promise<Object>} Result of the password reset email sending
  */
-async function sendPasswordResetEmail({ to, resetToken, resetUrl }) {
-  const siteName = process.env.SITE_NAME || 'Fresh Eats Market';
-  const tokenExpiry = parseInt(process.env.RESET_TOKEN_EXPIRY || '15');
-  
-  // Build the full reset URL - avoid double paths if resetUrl already contains the full path
-  const fullResetUrl = resetUrl.includes('reset-password.html') 
-    ? resetUrl 
-    : `${resetUrl}/reset-password.html?token=${resetToken}`;
-
-  return sendEmail({
-    to: to,
-    subject: `Password Reset Request - ${siteName}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h1 style="color: #4CAF50;">Password Reset</h1>
-        </div>
-        
-        <p>Hello,</p>
-        
-        <p>We received a request to reset your password for your ${siteName} account. If you didn't make this request, you can safely ignore this email.</p>
-        
-        <p>To reset your password, click the button below:</p>
-        
-        <div style="text-align: center; margin: 30px 0;">
-          <a href="${fullResetUrl}" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">Reset My Password</a>
-        </div>
-        
-        <p>Or copy and paste this URL into your browser:</p>
-        <p style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all;">
-          ${fullResetUrl}
-        </p>
-        
-        <p>This password reset link is only valid for the next ${tokenExpiry} minutes.</p>
-        
-        <p>If you're having trouble, please contact our support team.</p>
-        
-        <p>Thanks,<br>The ${siteName} Team</p>
-        
-        <div style="margin-top: 30px; font-size: 12px; color: #777; border-top: 1px solid #eee; padding-top: 20px;">
-          <p>If you didn't request a password reset, please ignore this email or contact support if you have concerns about your account security.</p>
-        </div>
-      </div>
-    `,
-    text: `
-      Password Reset - ${siteName}
-      
-      Hello,
-      
-      We received a request to reset your password for your ${siteName} account.
-      
-      To reset your password, click the link below:
-      
-      ${fullResetUrl}
-      
-      This password reset link is only valid for the next ${tokenExpiry} minutes.
-      
-      If you didn't request a password reset, please ignore this email or contact support if you have concerns about your account security.
-      
-      Thanks,
-      The ${siteName} Team
-    `
+async function sendPasswordResetEmail({ email, username, resetUrl }) {
+  console.log('Preparing to send password reset email:', {
+    recipient: email,
+    username: username || 'not provided',
+    resetUrl: resetUrl
   });
+  
+  // Validate required parameters
+  if (!email) {
+    console.error('Missing recipient email address for password reset');
+    return {
+      success: false,
+      message: 'Recipient email address is required',
+      error: { code: 'MISSING_PARAMETER', message: 'Email address is required' }
+    };
+  }
+  
+  if (!resetUrl) {
+    console.error('Missing reset URL for password reset email');
+    return {
+      success: false,
+      message: 'Reset URL is required',
+      error: { code: 'MISSING_PARAMETER', message: 'Reset URL is required' }
+    };
+  }
+  
+  // Get site configuration
+  const siteName = process.env.SITE_NAME || 'Fresh Eats Market';
+  const tokenExpiry = parseInt(process.env.RESET_TOKEN_EXPIRY || '60');
+  
+  // No need to modify the resetUrl - it should be passed in complete form
+  const fullResetUrl = resetUrl;
+  
+  try {
+    console.log('Sending password reset email with resetUrl:', fullResetUrl);
+    
+    // First verify email config before attempting to send
+    const configTest = await testEmailConfig();
+    if (!configTest.success) {
+      console.error('Email configuration test failed before sending reset email:', configTest);
+      return {
+        success: false,
+        message: 'Email configuration error',
+        error: { 
+          code: 'CONFIG_ERROR', 
+          message: 'Email service is not properly configured'
+        },
+        details: configTest
+      };
+    }
+    
+    // Send the actual email
+    const result = await sendEmail({
+      to: email,
+      subject: `Password Reset Request - ${siteName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h1 style="color: #4CAF50;">Password Reset</h1>
+          </div>
+          
+          <p>Hello${username ? ' ' + username : ''},</p>
+          
+          <p>We received a request to reset your password for your ${siteName} account. If you didn't make this request, you can safely ignore this email.</p>
+          
+          <p>To reset your password, click the button below:</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${fullResetUrl}" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; font-weight: bold;">Reset My Password</a>
+          </div>
+          
+          <p>Or copy and paste this URL into your browser:</p>
+          <p style="background-color: #f5f5f5; padding: 10px; border-radius: 4px; word-break: break-all;">
+            ${fullResetUrl}
+          </p>
+          
+          <p>This password reset link is only valid for the next ${tokenExpiry} minutes.</p>
+          
+          <p>If you're having trouble, please contact our support team.</p>
+          
+          <p>Thanks,<br>The ${siteName} Team</p>
+          
+          <div style="margin-top: 30px; font-size: 12px; color: #777; border-top: 1px solid #eee; padding-top: 20px;">
+            <p>If you didn't request a password reset, please ignore this email or contact support if you have concerns about your account security.</p>
+          </div>
+        </div>
+      `,
+      text: `
+        Password Reset - ${siteName}
+        
+        Hello${username ? ' ' + username : ''},
+        
+        We received a request to reset your password for your ${siteName} account.
+        
+        To reset your password, click the link below:
+        
+        ${fullResetUrl}
+        
+        This password reset link is only valid for the next ${tokenExpiry} minutes.
+        
+        If you didn't request a password reset, please ignore this email or contact support if you have concerns about your account security.
+        
+        Thanks,
+        The ${siteName} Team
+      `
+    });
+    
+    if (!result.success) {
+      console.error('Failed to send password reset email:', result);
+      return result;
+    }
+    
+    console.log('Password reset email sent successfully to:', email);
+    return {
+      success: true,
+      message: 'Password reset email sent successfully',
+      emailId: result.emailId
+    };
+  } catch (error) {
+    console.error('Exception while sending password reset email:', {
+      error: error.message,
+      stack: error.stack,
+      email: email
+    });
+    
+    return {
+      success: false,
+      message: 'Failed to send password reset email',
+      error: {
+        code: error.code || 'EMAIL_SEND_ERROR',
+        message: error.message || 'Unknown error occurred while sending email'
+      },
+      troubleshooting: getEmailTroubleshooting(error)
+    };
+  }
+
 }
 
 /**
@@ -333,11 +409,12 @@ function getEmailTroubleshooting(error) {
   return troubleshooting;
 }
 
-module.exports = {
+// Export all functions as named exports
+export {
   testEmailConfig,
   sendEmail,
   sendTestEmail,
   sendPasswordResetEmail,
-  getEmailTroubleshooting
+  getEmailTroubleshooting,
+  getResendClient
 };
-

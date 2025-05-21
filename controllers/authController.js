@@ -6,17 +6,18 @@
 // --------------------------------------
 // Imports
 // --------------------------------------
-const { pool } = require('../config/database');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-const Joi = require('joi');
-const nodemailer = require('nodemailer');
+import { pool } from '../config/database.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import Joi from 'joi';
+import nodemailer from 'nodemailer';
 // Import required models
-const UserModel = require('../models/UserModel');
-const BlacklistedTokenModel = require('../models/BlacklistedTokenModel');
-const emailService = require('../services/emailService');
-const { generateToken } = require('../utils/jwt');
+import { UserModel } from '../models/UserModel.js';
+import { BlacklistedTokenModel } from '../models/BlacklistedTokenModel.js';
+// Import email service 
+import { sendPasswordResetEmail, testEmailConfig } from '../services/emailService.js';
+import { generateToken } from '../utils/jwt.js';
 
 // --------------------------------------
 // Database Helpers
@@ -224,8 +225,10 @@ const getAdminList = async (connection, detailed = false) => {
  * User registration controller
  */
 const signup = async (req, res) => {
+  let connection = null;
   try {
     console.log('Starting user registration process');
+    
     // Validate input data
     const { error } = validationSchemas.signup.validate(req.body);
     if (error) {
@@ -238,68 +241,133 @@ const signup = async (req, res) => {
 
     const { username, email, password } = req.body;
     console.log('Registering user with username:', username, 'and email:', email);
-    // Check if user already exists with this email
-    const userExists = await UserModel.exists(email);
-    if (userExists) {
-      console.log('User already exists with email:', email);
-      return res.status(400).json({
-        success: false,
-        message: 'User already exists with this email'
-      });
-    }
-
-    // Check if username is already taken
-    const usernameExists = await UserModel.findByUsername(username);
-    if (usernameExists) {
-      console.log('Username already taken:', username);
-      return res.status(400).json({
-        success: false,
-        message: 'Username is already taken'
-      });
-    }
-
-    // Create user
-    const user = await UserModel.createUser({ username, email, password });
-    console.log('User created successfully with ID:', user.id);
-    // Generate token
-    const token = generateToken(user);
-
-    // Set cookie with improved settings for cross-origin authentication
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours in milliseconds
-      path: '/',
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
-    });
-
-    // Log cookie settings for debugging
-    console.log('Setting auth cookie on signup with config:', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined,
-      env: process.env.NODE_ENV
-    });
-
-    // Return user data and token
-    return res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        user: {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role
-        },
-        token
+    
+    // Create a connection from the pool
+    connection = await pool.getConnection();
+    console.log('Connection 1 acquired');
+    
+    // Start a transaction for data consistency
+    await connection.beginTransaction();
+    console.log('Transaction started for signup');
+    
+    try {
+      // Check if user already exists with this email - direct query for transaction safety
+      const [emailExists] = await connection.query(
+        'SELECT COUNT(*) as count FROM users WHERE LOWER(email) = LOWER(?)',
+        [email]
+      );
+      
+      if (emailExists && emailExists[0] && emailExists[0].count > 0) {
+        console.log('User already exists with email:', email);
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'User already exists with this email'
+        });
       }
-    });
+
+      // Check if username is already taken - direct query for transaction safety
+      const [usernameExists] = await connection.query(
+        'SELECT COUNT(*) as count FROM users WHERE LOWER(username) = LOWER(?)',
+        [username]
+      );
+      
+      if (usernameExists && usernameExists[0] && usernameExists[0].count > 0) {
+        console.log('Username already taken:', username);
+        await connection.rollback();
+        return res.status(400).json({
+          success: false,
+          message: 'Username is already taken'
+        });
+      }
+
+      // Hash the password
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(password, salt);
+      
+      // Insert the user
+      const [result] = await connection.execute(
+        'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
+        [username, email, passwordHash, 'user']
+      );
+      
+      const userId = result.insertId;
+      
+      // Verify the user was created
+      const [userRows] = await connection.query(
+        'SELECT id, username, email, role, created_at FROM users WHERE id = ?',
+        [userId]
+      );
+      
+      if (!userRows || userRows.length === 0) {
+        throw new Error('User creation failed - unable to retrieve new user');
+      }
+      
+      const user = userRows[0];
+      console.log('User created successfully with ID:', user.id);
+      
+      // Commit the transaction
+      await connection.commit();
+      console.log('Transaction committed for signup');
+      
+      // Generate token
+      const token = generateToken(user);
+
+      // Set cookie with improved settings for cross-origin authentication
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: parseInt(process.env.COOKIE_MAX_AGE) || 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+        path: '/',
+        domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined
+      });
+
+      // Log cookie settings for debugging
+      console.log('Setting auth cookie on signup with config:', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : undefined,
+        env: process.env.NODE_ENV
+      });
+
+      // Return user data and token
+      return res.status(201).json({
+        success: true,
+        message: 'User registered successfully',
+        data: {
+          user: {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role
+          },
+          token
+        }
+      });
+    } catch (txError) {
+      // Rollback on transaction error
+      console.error('Transaction error during signup:', txError);
+      if (connection) {
+        await connection.rollback();
+        console.log('Transaction rolled back due to error');
+      }
+      throw txError;
+    }
   } catch (error) {
     console.error('Registration error:', error);
     return handleError(res, error, 'Server error during registration');
+  } finally {
+    // Always release connection in finally block
+    if (connection) {
+      try {
+        connection.release();
+        console.log('Connection 1 released');
+      } catch (releaseError) {
+        console.error('Error releasing connection:', releaseError);
+      }
+    }
   }
 };
 
@@ -1020,7 +1088,6 @@ const getAdminDetails = async (req, res) => {
         if (connection) connection.release();
     }
 };
-
 /**
  * Initiates the password reset process by generating a token and sending an email
  * @param {Object} req - HTTP request object
@@ -1028,113 +1095,376 @@ const getAdminDetails = async (req, res) => {
  * @returns {Object} JSON response
  */
 const forgotPassword = async (req, res) => {
-  const connection = await getConnection();
-  const clientIP = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  // Generate a unique request ID for tracking this specific request through logs
+  const requestId = crypto.randomBytes(4).toString('hex');
+  console.log(`[${requestId}] Processing forgot password request`);
+  
+  // Log database connection settings at the start
+  console.log(`[${requestId}] Database config:`, {
+    host: process.env.DB_HOST || 'not set',
+    database: process.env.DB_NAME || 'not set',
+    ssl: process.env.DB_SSL || 'not set',
+    port: process.env.DB_PORT || 'not set',
+    sslMode: process.env.DB_SSL_MODE || 'not set'
+  });
+  
+  let connection = null;
+  let transactionStarted = false;
+  let connectionAcquired = false;
   
   try {
-    console.log('Processing forgot password request');
-    
-    // Validate the email from request body
     const { email } = req.body;
+    
+    // Validate email
     if (!email) {
       return res.status(400).json({
         success: false,
-        message: 'Email is required'
+        message: 'Email is required',
+        requestId: requestId
       });
     }
     
-    // Check rate limiting to prevent abuse
-    const [resetAttempts] = await connection.execute(
-      'SELECT COUNT(*) as count FROM password_reset_tokens WHERE email = ? AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)',
-      [email]
-    );
+    // Get client IP for rate limiting
+    const clientIP = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    console.log(`[${requestId}] Request from IP: ${clientIP}`);
     
-    if (resetAttempts[0].count >= 3) {
-      // Log rate limit exceeded
-      await connection.execute(
-        'INSERT INTO audit_log (event_type, event_description, ip_address) VALUES (?, ?, ?)',
-        ['RATE_LIMIT_EXCEEDED', `Rate limit exceeded for password reset attempts on ${email}`, clientIP]
-      );
+    // Get a database connection from the pool with full SSL verification
+    try {
+      console.log(`[${requestId}] Attempting to acquire database connection...`);
+      connection = await pool.getConnection();
+      connectionAcquired = true;
+      console.log(`[${requestId}] Database connection acquired successfully`);
       
-      return res.status(429).json({
-        success: false,
-        message: 'Too many reset attempts. Please try again later.',
-        retryAfter: 900 // 15 minutes in seconds
+      // Check connection configuration details
+      console.log(`[${requestId}] Connection config:`, {
+        ssl: connection.config?.ssl ? 'Configured' : 'Not Configured',
+        sslMode: process.env.DB_SSL_MODE || 'not set',
+        certPath: process.env.SSL_CERT_PATH || 'not set',
+        connectTimeout: connection.config?.connectTimeout || 'default',
+        connectionLimit: pool.config?.connectionLimit || 'unknown'
       });
+      
+      // Verify the connection works with a simple query
+      const [connectionTest] = await connection.query('SELECT 1 as connection_test');
+      console.log(`[${requestId}] Connection test successful:`, connectionTest[0]);
+      
+      // Check SSL status and ciphers if possible
+      try {
+        const [sslStatus] = await connection.query(`
+          SHOW STATUS LIKE 'Ssl_cipher'
+        `);
+        
+        if (sslStatus && sslStatus.length > 0) {
+          console.log(`[${requestId}] SSL Status: ${sslStatus[0].Variable_name} = ${sslStatus[0].Value}`);
+          // Additional SSL verification
+          const [sslVersion] = await connection.query(`SHOW STATUS LIKE 'Ssl_version'`);
+          if (sslVersion && sslVersion.length > 0) {
+            console.log(`[${requestId}] ${sslVersion[0].Variable_name} = ${sslVersion[0].Value}`);
+          }
+          
+          // Check more comprehensive SSL status
+          const [sslParams] = await connection.query(`
+            SHOW STATUS WHERE Variable_name LIKE 'ssl%'
+          `);
+          if (sslParams && sslParams.length > 0) {
+            console.log(`[${requestId}] Full SSL parameters:`, 
+              sslParams.reduce((obj, item) => {
+                obj[item.Variable_name] = item.Value;
+                return obj;
+              }, {})
+            );
+          }
+        } else {
+          console.warn(`[${requestId}] WARNING: SSL may not be enabled for this connection`);
+        }
+      } catch (sslCheckError) {
+        console.error(`[${requestId}] Error checking SSL status:`, sslCheckError);
+      }
+      
+    } catch (connectionError) {
+      console.error(`[${requestId}] ERROR ACQUIRING CONNECTION:`, connectionError);
+      throw new Error(`Database connection failed: ${connectionError.message}`);
     }
     
-    // Check if user exists
-    const [users] = await connection.execute(
-      'SELECT id, username FROM users WHERE email = ?',
-      [email]
-    );
+    // Log connection pool status if available
+    try {
+      if (pool && typeof pool.getConnectionCount === 'function') {
+        const poolStatus = await pool.getConnectionCount().catch(err => ({ error: err.message }));
+        console.log(`[${requestId}] Current pool status:`, poolStatus);
+      } else {
+        console.log(`[${requestId}] Pool status check not available`);
+      }
+    } catch (poolError) {
+      console.error(`[${requestId}] Failed to check pool status:`, poolError);
+    }
     
-    // Always return success whether account exists or not to prevent user enumeration
-    if (users.length === 0) {
-      console.log(`Password reset requested for non-existent email: ${email}`);
+    // Begin transaction for data consistency
+    try {
+      console.log(`[${requestId}] Starting transaction...`);
+      await connection.beginTransaction();
+      transactionStarted = true;
+      console.log(`[${requestId}] Transaction started successfully`);
       
-      // Log the attempt for non-existent user
+      // Log transaction isolation level for debugging
+      const [isolationLevel] = await connection.query('SELECT @@transaction_isolation as level');
+      console.log(`[${requestId}] Transaction isolation level:`, isolationLevel[0].level);
+    } catch (transactionError) {
+      console.error(`[${requestId}] Transaction start failed:`, transactionError);
+      throw new Error(`Failed to start transaction: ${transactionError.message}`);
+    }
+    
+    try {
+      // Check rate limiting for this IP to prevent abuse
+      console.log(`[${requestId}] Checking rate limits for IP: ${clientIP}`);
+      const [rateLimitCheck] = await connection.execute(
+        'SELECT COUNT(*) as count FROM password_reset_attempts WHERE ip_address = ? AND attempt_timestamp > DATE_SUB(NOW(), INTERVAL 1 HOUR)',
+        [clientIP]
+      );
+      console.log(`[${requestId}] Rate limit check result:`, rateLimitCheck[0]);
+      
+      // If more than 5 attempts in the last hour from this IP, rate limit
+      if (rateLimitCheck[0].count >= 5) {
+        console.log(`[${requestId}] Rate limit exceeded for IP ${clientIP}: ${rateLimitCheck[0].count} attempts`);
+        
+        if (transactionStarted) {
+          await connection.rollback();
+          console.log(`[${requestId}] Transaction rolled back due to rate limit`);
+        }
+        
+        return res.status(429).json({
+          success: false,
+          message: 'Too many password reset requests. Please try again later.',
+          retryAfter: 3600 // 1 hour in seconds
+        });
+      }
+      
+      // Record this attempt regardless of whether the email exists
       await connection.execute(
-        'INSERT INTO audit_log (event_type, event_description, ip_address) VALUES (?, ?, ?)',
-        ['PASSWORD_RESET_REQUEST', `Password reset requested for non-existent email: ${email}`, clientIP]
+        'INSERT INTO password_reset_attempts (ip_address, email, attempt_timestamp) VALUES (?, ?, NOW())',
+        [clientIP, email]
+      );
+      console.log(`[${requestId}] Recorded password reset attempt for tracking`);
+      
+      // Check if the email exists in our system
+      console.log(`[${requestId}] Checking if email exists: ${email}`);
+      const [userRows] = await connection.execute(
+        'SELECT id, username, email FROM users WHERE LOWER(email) = LOWER(?)',
+        [email]
       );
       
+      // Don't reveal whether or not the email exists for security
+      // Always pretend we found the user and sent the email
+      if (userRows.length === 0) {
+        console.log(`[${requestId}] Email not found in system: ${email}`);
+        
+        // Commit transaction even though we won't send an email
+        await connection.commit();
+        transactionStarted = false;
+        console.log(`[${requestId}] Transaction committed (no user found case)`);
+        
+        // Return success message to prevent user enumeration
+        return res.status(200).json({
+          success: true,
+          message: 'If your email is registered in our system, you will receive password reset instructions shortly',
+          requestId: requestId
+        });
+      }
+      
+      // At this point we have a valid user
+      const user = userRows[0];
+      console.log(`[${requestId}] User found with ID: ${user.id}`);
+      
+      // Generate a secure random token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      
+      // Create a hash of the token to store in the database
+      const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+      console.log(`[${requestId}] Reset token generated for user ID: ${user.id}`);
+      
+      // Set token expiration (1 hour)
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 1);
+      
+      // Delete any existing tokens for this user
+      await connection.execute(
+        'DELETE FROM password_reset_tokens WHERE user_id = ?',
+        [user.id]
+      );
+      console.log(`[${requestId}] Deleted any existing reset tokens for user`);
+      
+      // Save the token in the database
+      await connection.execute(
+        'INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)',
+        [user.id, resetTokenHash, expiresAt]
+      );
+      console.log(`[${requestId}] New reset token stored in database with expiry: ${expiresAt.toISOString()}`);
+      
+      // Commit the transaction
+      await connection.commit();
+      transactionStarted = false;
+      console.log(`[${requestId}] Database transaction committed successfully`);
+      
+      // Generate reset URL for the frontend
+      const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+      console.log(`[${requestId}] Reset URL generated: ${resetUrl.substring(0, 30)}...`);
+      
+      try {
+        // Send email with reset link outside of transaction
+        console.log(`[${requestId}] Attempting to send password reset email to: ${user.email}`);
+        
+        // Use the sendPasswordResetEmail function (imported directly)
+        // Pass the parameters as an object as expected by the service
+        const emailResult = await sendPasswordResetEmail({
+          email: user.email,
+          username: user.username,
+          resetUrl: resetUrl,
+          requestId: requestId // Explicitly pass the requestId for better tracing
+        }).catch(error => {
+          console.error(`[${requestId}] Email sending error caught:`, error);
+          return { success: false, error: error.message || 'Unknown email error' };
+        });
+        
+        console.log(`[${requestId}] Email sending result:`, emailResult);
+        
+        if (!emailResult || !emailResult.success) {
+          console.error(`[${requestId}] Failed to send email:`, emailResult?.error || 'No result returned from email service');
+          throw new Error(`Email sending failed: ${emailResult?.error || 'Email service error'}`);
+        }
+        
+        console.log(`[${requestId}] Password reset email sent successfully to: ${user.email}`);
+        
+      } catch (emailError) {
+        console.error(`[${requestId}] Email service error:`, emailError);
+        
+        // Check specifically for Resend API permission errors
+        const isResendPermissionError = 
+          emailError.message?.includes('only allows sending to verified email addresses') ||
+          emailError.message?.includes('not a permitted address');
+          
+        if (isResendPermissionError && process.env.NODE_ENV === 'development') {
+          console.warn(`[${requestId}] Resend API test mode restriction detected: ${emailError.message}`);
+        }
+        
+        // Log the error but don't fail the request - the user can request another reset
+        // The token is already saved in the database
+        return res.status(200).json({
+          success: true,
+          message: 'If your email is registered in our system, you will receive password reset instructions shortly',
+          warning: process.env.NODE_ENV === 'development' ? 'Email sending failed, but token was created. Check server logs.' : undefined,
+          requestId: requestId
+        });
+      }
+      
+      // Return success response
       return res.status(200).json({
         success: true,
-        message: 'If an account exists with that email, a password reset link will be sent.'
+        message: 'If your email is registered in our system, you will receive password reset instructions shortly',
+        requestId: requestId
       });
+      
+    } catch (dbError) {
+      console.error(`[${requestId}] Database error:`, dbError);
+      
+      // Log detailed information about the error for better diagnostics
+      console.error(`[${requestId}] Database error details:`, {
+        code: dbError.code || 'No error code',
+        sqlState: dbError.sqlState || 'No SQL state',
+        sqlMessage: dbError.sqlMessage || 'No SQL message',
+        stack: dbError.stack || 'No stack trace'
+      });
+      
+      // Check for specific MySQL error codes related to SSL
+      if (dbError.code === 'ER_SSL_CONNECTION_ERROR' || 
+          dbError.sqlMessage?.includes('SSL') || 
+          dbError.sqlMessage?.includes('certificate')) {
+        console.error(`[${requestId}] SSL connection error detected. Check certificate configuration.`);
+      }
+      
+      // Rollback if transaction was started
+      if (transactionStarted && connection) {
+        try {
+          await connection.rollback();
+          transactionStarted = false;
+          console.log(`[${requestId}] Transaction rolled back after database error`);
+        } catch (rollbackError) {
+          console.error(`[${requestId}] Failed to rollback transaction:`, rollbackError);
+        }
+      }
+      
+      throw new Error(`Database operation failed: ${dbError.message}`);
     }
     
-    const user = users[0];
-    
-    // Generate secure token for password reset
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
-    
-    // Store token in database (invalidating any previous tokens)
-    await connection.execute(
-      'DELETE FROM password_reset_tokens WHERE email = ?',
-      [email]
-    );
-    
-    // Set expiration to 1 hour from now
-    const tokenExpiry = new Date(Date.now() + 3600000); // 1 hour
-    
-    await connection.execute(
-      'INSERT INTO password_reset_tokens (email, token, expires_at, user_id) VALUES (?, ?, ?, ?)',
-      [email, tokenHash, tokenExpiry, user.id]
-    );
-    
-    // Create a reset link with the token
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-    
-    // Send the email using the emailService
-    const emailResult = await emailService.sendPasswordResetEmail({
-      email,
-      username: user.username,
-      resetUrl
-    });
-    
-    if (!emailResult.success) {
-      console.error('Failed to send password reset email:', emailResult.error);
-      throw new Error('Failed to send password reset email');
-    }
-    
-    // Log the password reset request
-    await connection.execute(
-      'INSERT INTO audit_log (user_id, event_type, event_description, ip_address) VALUES (?, ?, ?, ?)',
-      [user.id, 'PASSWORD_RESET_REQUEST', 'Password reset email sent', clientIP]
-    );
-    
-    return res.status(200).json({
-      success: true,
-      message: 'If an account exists with that email, a password reset link will be sent.'
-    });
   } catch (error) {
-    console.error('Forgot password error:', error);
-    return handleError(res, error, 'Error processing password reset request');
+    console.error(`[${requestId}] Forgot password critical error:`, error);
+    
+    // Capture error details for debugging
+    const errorDetails = {
+      message: error.message,
+      code: error.code || 'No error code',
+      stack: process.env.NODE_ENV === 'development' ? error.stack : 'Hidden in production',
+      timestamp: new Date().toISOString(),
+      requestId: requestId
+    };
+    console.error(`[${requestId}] Error details:`, errorDetails);
+    
+    // Ensure we rollback any open transaction
+    if (transactionStarted && connection) {
+      try {
+        await connection.rollback();
+        console.log(`[${requestId}] Transaction rolled back in error handler`);
+      } catch (rollbackError) {
+        console.error(`[${requestId}] Rollback error in error handler:`, rollbackError);
+      }
+    }
+    
+    // Determine specific error message based on error type
+    let errorMessage = 'An error occurred processing your request';
+    let errorCategory = 'GENERAL_ERROR';
+    
+    if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      errorMessage = 'Database connection error. Please try again later.';
+      errorCategory = 'DB_CONNECTION_ERROR';
+    } else if (error.message.includes('SSL') || error.message.includes('certificate')) {
+      errorMessage = 'Secure connection issue. Please try again later.';
+      errorCategory = 'SSL_ERROR';
+    } else if (error.message.includes('handshake') || error.message.includes('Client does not support authentication protocol')) {
+      errorMessage = 'Database authentication failed. Please try again later.';
+      errorCategory = 'DB_AUTH_ERROR';
+    } else if (error.message.includes('email') || error.message.includes('sending')) {
+      // Check for Resend API specific errors
+      if (error.message.includes('only allows sending to verified email addresses') || 
+          error.message.includes('not a permitted address')) {
+        console.warn(`[${requestId}] Resend test mode restriction detected in error handler`);
+        // In production, we don't want to reveal the real issue to maintain security
+        errorMessage = process.env.NODE_ENV === 'development' ? 
+          'Email service in test mode - can only send to verified addresses. Use a verified test email address.' :
+          'Error sending email. Your reset token was created, but the email could not be sent.';
+        errorCategory = 'EMAIL_RESTRICTION_ERROR';
+      } else {
+        errorMessage = 'Error sending email. Your reset token was created, but the email could not be sent.';
+        errorCategory = 'EMAIL_SEND_ERROR';
+      }
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      category: errorCategory,
+      requestId: requestId
+    });
   } finally {
-    if (connection) connection.release();
+    // Always release the connection in finally block
+    if (connection && connectionAcquired) {
+      try {
+        console.log(`[${requestId}] Releasing database connection`);
+        await connection.release();
+        console.log(`[${requestId}] Database connection released successfully`);
+      } catch (releaseError) {
+        console.error(`[${requestId}] Error releasing database connection:`, releaseError);
+        // Don't throw error here, as it would override any error in the main try-catch
+      }
+    }
   }
 };
 
@@ -1283,15 +1613,22 @@ const resetPassword = async (req, res) => {
       throw error;
     }
   } catch (error) {
-    console.error('Reset password error:', error);
-    return handleError(res, error, 'Error resetting password');
+    console.error('Forgot password error:', error);
+    return handleError(res, error, 'Error processing password reset request');
   } finally {
-    if (connection) connection.release();
+    if (connection) {
+      try {
+        connection.release();
+        console.log('Connection 2 released');
+      } catch (releaseError) {
+        console.error('Error releasing connection:', releaseError);
+      }
+    }
   }
 };
 
 // Export all controller methods
-module.exports = {
+export {
   // User authentication
   signup,
   login,

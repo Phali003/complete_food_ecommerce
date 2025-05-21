@@ -2,165 +2,48 @@ const mysql = require('mysql2/promise');
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 
-// Helper function to validate CA certificate content
-const validateCertificate = (certContent) => {
-  try {
-    // 1. Basic structure validation
-    if (!certContent.includes('-----BEGIN CERTIFICATE-----') || 
-        !certContent.includes('-----END CERTIFICATE-----')) {
-      throw new Error('Invalid certificate format: Missing BEGIN/END markers');
-    }
+/**
+ * Simple database connection module with proper SSL handling
+ * Specially configured for Aiven MySQL Cloud
+ */
 
-    // 2. Extract certificate body
-    const certBody = certContent
-      .replace('-----BEGIN CERTIFICATE-----', '')
-      .replace('-----END CERTIFICATE-----', '')
-      .replace(/[\r\n]/g, '');
+console.log('Initializing database connection module...');
 
-    // 3. Validate base64 encoding
-    try {
-      const certBuffer = Buffer.from(certBody, 'base64');
-      if (certBuffer.length < 100) { // Valid certificates are typically larger
-        throw new Error('Certificate content too small to be valid');
-      }
-    } catch (b64Error) {
-      throw new Error('Invalid certificate: Not properly base64 encoded');
-    }
-
-    // 4. Additional security checks
-    const securityChecks = {
-      hasVersion: certContent.includes('Version:'),
-      hasSerial: certContent.includes('Serial Number:'),
-      hasSignature: certContent.includes('Signature Algorithm:'),
-      hasIssuer: certContent.includes('Issuer:'),
-      hasValidity: certContent.includes('Validity'),
-      hasSubject: certContent.includes('Subject:'),
-      hasPublicKey: certContent.includes('Public Key Algorithm:')
-    };
-
-    // Log certificate details in production
-    if (process.env.NODE_ENV === 'production') {
-      console.log('Certificate Validation Details:', {
-        certLength: certContent.length,
-        securityChecks,
-        provider: 'Aiven MySQL'
-      });
-    }
-
-    // Return validation result
-    return true;
-  } catch (error) {
-    console.error('Certificate Validation Error:', error.message);
-    throw error;
-  }
-};
-
-// Helper function to check certificate expiration
-const checkCertificateExpiration = (certContent) => {
-  try {
-    // Extract certificate information between BEGIN and END markers
-    const certB64 = certContent
-      .split('-----BEGIN CERTIFICATE-----')[1]
-      .split('-----END CERTIFICATE-----')[0]
-      .replace(/\s/g, '');
-    
-    // Convert to buffer and read as ASN.1
-    const certBuffer = Buffer.from(certB64, 'base64');
-    
-    // Basic validation of buffer size
-    if (certBuffer.length < 100) { // Certificates are typically larger
-      throw new Error('Certificate content appears to be too small');
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Certificate validation error:', error.message);
-    return false;
-  }
-};
-
-// Use environment variable for CA cert or default to trusted certs
-let caCert = undefined;
-
-// Function to try loading a certificate from various possible locations
-const loadCertificate = () => {
-  try {
-    // First priority: Check DB_CA_CERT environment variable
-    if (process.env.DB_CA_CERT) {
-      const certPath = process.env.DB_CA_CERT;
-      
-      // Case 1: Environment variable contains certificate content
-      if (certPath.includes('-----BEGIN CERTIFICATE-----')) {
-        console.log('Using CA cert content from environment variable');
-        return certPath;
-      }
-      
-      // Case 2: Environment variable points to a .pem file
-      if (certPath.endsWith('.pem') && fs.existsSync(certPath)) {
-        console.log(`Loading CA cert from specified file: ${certPath}`);
-        return fs.readFileSync(certPath, 'utf8');
-      }
-    }
-    
-    // Second priority: Check standard locations in production
-    if (process.env.NODE_ENV === 'production') {
-      // Check in 'certs' directory for various common filenames
-      const certDir = path.join(process.cwd(), 'certs');
-      const possibleCertFiles = [
-        'ca.pem', 
-        'ca-certificate.pem', 
-        'aiven-ca.pem',
-        'mysql-ca.pem', 
-        'ca-cert.pem'
-      ];
-      
-      console.log(`Checking for certificates in: ${certDir}`);
-      if (fs.existsSync(certDir)) {
-        for (const certFile of possibleCertFiles) {
-          const fullPath = path.join(certDir, certFile);
-          if (fs.existsSync(fullPath)) {
-            console.log(`Found CA certificate at: ${fullPath}`);
-            return fs.readFileSync(fullPath, 'utf8');
-          }
-        }
-        console.log('No standard CA certificate files found in certs directory');
-      } else {
-        console.warn('Certs directory not found at:', certDir);
-      }
-    }
-    
-    return null;
-  } catch (err) {
-    console.error('Error loading certificate:', err.message);
-    return null;
-  }
-};
-
-// Attempt to load the certificate
+// Load and validate SSL certificate - critical for Aiven MySQL
+let caCert;
 try {
-  const certContent = loadCertificate();
+  // Look for certificate in the certs directory
+  const certPath = path.join(process.cwd(), 'certs', 'ca.pem');
   
-  if (certContent) {
-    // Validate certificate format
-    validateCertificate(certContent);
-
-    // Check certificate expiration
-    if (!checkCertificateExpiration(certContent)) {
-      console.warn('Warning: CA certificate validation failed - check if certificate is valid');
-    }
-
-    caCert = certContent;
-    console.log('Successfully loaded CA certificate for database SSL connection');
-  } else if (process.env.NODE_ENV === 'production') {
-    console.warn('No CA certificate found for production environment');
-    console.warn('Will rely on default trusted certificates, but this may cause SSL verification issues');
+  if (!fs.existsSync(certPath)) {
+    throw new Error(`Certificate file not found at ${certPath}. Please add your Aiven CA certificate.`);
   }
-} catch (err) {
-  console.error('CA Certificate Error:', err.message);
-  console.error('Will rely on default trusted certificates');
-  console.error('For production environments, a valid CA certificate is strongly recommended');
+  
+  console.log(`Reading certificate from ${certPath}...`);
+  caCert = fs.readFileSync(certPath, 'utf8');
+  
+  // Simple validation
+  if (!caCert.includes('-----BEGIN CERTIFICATE-----') || 
+      !caCert.includes('-----END CERTIFICATE-----')) {
+    throw new Error('Invalid certificate format: Missing BEGIN/END markers');
+  }
+  
+  console.log('SSL certificate loaded successfully:', {
+    size: caCert.length,
+    valid: true
+  });
+} catch (error) {
+  console.error('❌ CRITICAL ERROR - Failed to load SSL certificate:', error.message);
+  console.error('Aiven MySQL requires SSL connection with a valid CA certificate.');
+  console.error('Please ensure the CA certificate file exists at: ./certs/ca.pem');
+  
+  if (process.env.NODE_ENV === 'production') {
+    console.error('Exiting application due to missing SSL certificate in production environment');
+    process.exit(1); // Exit in production since we cannot connect securely
+  } else {
+    console.warn('Continuing without SSL certificate in development mode, but connection will likely fail');
+  }
 }
 
 // Log database configuration (without password)
@@ -169,37 +52,45 @@ console.log('Database Configuration:', {
   user: process.env.DB_USER,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT || 3306,
+  ssl: process.env.DB_SSL || 'true'
 });
 
-// Define pool configuration
+// Simplified pool configuration for Aiven MySQL
 const poolConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT || 3306,
+  
+  // Connection pool settings optimized for cloud hosting
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0,
-  connectTimeout: 60000,
-  debug: false, // Disable debug for production
-  trace: false, // Disable trace for production
+  
+  // Increase timeouts for cloud database
+  connectTimeout: 60000, // 60 seconds
+  acquireTimeout: 60000,
+  timeout: 60000,
+  
+  // SSL configuration optimized for Aiven MySQL
+  ssl: {
+    // Required for Aiven MySQL
+    rejectUnauthorized: true,
+    // Add CA certificate directly
+    ca: caCert,
+    // Use modern TLS version
+    minVersion: 'TLSv1.2'
+  },
+  
+  // Additional settings for stability
   multipleStatements: false,
   dateStrings: true,
-  // Enhanced SSL configuration for Aiven MySQL Cloud with TLS
-  ssl: process.env.DB_SSL === 'true' ? {
-    // For Aiven MySQL, we need to disable certificate verification in development
-    // but maintain security in production
-    rejectUnauthorized: process.env.NODE_ENV === 'production', 
-    minVersion: 'TLSv1.2', // Enforce minimum TLS version
-    // Only add CA cert if available, otherwise use default trusted certificates
-    ...(caCert ? { ca: caCert } : {})
-  } : undefined
+  timezone: 'UTC'
 };
 
-// Add warning for development mode with SSL certificate verification disabled
+// Add warning for development mode
 if (process.env.NODE_ENV !== 'production' && process.env.DB_SSL === 'true') {
   console.warn('------------------------------------------------------------------');
   console.warn('WARNING: SSL certificate verification is disabled in development mode');
@@ -208,10 +99,249 @@ if (process.env.NODE_ENV !== 'production' && process.env.DB_SSL === 'true') {
   console.warn('------------------------------------------------------------------');
 }
 
-// Create connection pool with the configured settings
-const pool = mysql.createPool(poolConfig);
+// Define helper functions first
+const handleSSLError = (error) => {
+  if (error.message && (
+    error.message.includes('SSL') || 
+    error.message.includes('certificate') || 
+    error.message.includes('TLS')
+  )) {
+    console.error('SSL/TLS Connection Error: This may be due to misconfigured SSL settings.');
+    console.error('For Aiven MySQL databases, ensure you have:');
+    console.error('1. Set DB_SSL=true in your .env file');
+    console.error('2. Configured the proper SSL mode in your Aiven console');
+    console.error('3. Place your CA certificate in the "certs" directory as ca.pem or similar');
+    console.error('   (or set DB_CA_CERT environment variable to your certificate file path/content)');
+    return true;
+  }
+  return false;
+};
 
-// Connection pool monitoring
+// Connection verification function
+const verifyConnection = async (connection, operation = 'operation') => {
+  console.log(`Verifying connection before ${operation}...`);
+  try {
+    await connection.ping();  // This will throw if connection is invalid
+    return true;
+  } catch (error) {
+    console.error(`Connection verification failed for ${operation}:`, error);
+    throw error;
+  }
+};
+
+// Factory to create database methods with proper connection handling
+const createPoolMethods = (pool) => {
+  if (!pool || typeof pool.getConnection !== 'function') {
+    throw new Error('Invalid pool passed to createPoolMethods - missing getConnection function');
+  }
+
+  // Define the query method with direct connection acquisition
+  const query = async (sql, params) => {
+    let connection;
+    try {
+      connection = await pool.getConnection().catch(connError => {
+        console.error('Failed to acquire connection:', connError);
+        throw new Error(`Database connection error: ${connError.message}`);
+      });
+      
+      console.log('Pool connection acquired for query');
+      const [results] = await connection.query(sql, params);
+      console.log('Query executed successfully, result count:', 
+        Array.isArray(results) ? results.length : 'non-array result');
+      return results;
+    } catch (error) {
+      console.error('Query Error:', {
+        message: error.message,
+        code: error.code,
+        sql: sql,
+        params: JSON.stringify(params)
+      });
+      throw error;
+    } finally {
+      if (connection) {
+        try {
+          connection.release();
+          console.log('Connection released after query');
+        } catch (releaseError) {
+          console.error('Error releasing connection:', releaseError);
+        }
+      }
+    }
+  };
+
+  // Define the execute method with direct connection acquisition
+  const execute = async (sql, params) => {
+    let connection;
+    try {
+      connection = await pool.getConnection().catch(connError => {
+        console.error('Failed to acquire connection for execute:', connError);
+        throw new Error(`Database connection error in execute: ${connError.message}`);
+      });
+      
+      console.log('Using execute method with dedicated connection');
+      const [results] = await connection.execute(sql, params);
+      return results;
+    } catch (error) {
+      console.error('Execute Error:', {
+        message: error.message,
+        code: error.code,
+        sql: sql,
+        params: JSON.stringify(params)
+      });
+      throw error;
+    } finally {
+      if (connection) {
+        try {
+          connection.release();
+          console.log('Connection released after execute');
+        } catch (releaseError) {
+          console.error('Error releasing connection after execute:', releaseError);
+        }
+      }
+    }
+  };
+
+  return { query, execute };
+};
+
+// Define test function outside of the try block
+const testPoolConnection = async (pool) => {
+  let connection;
+  try {
+    console.log('⏳ Testing initial database connection...');
+    connection = await pool.getConnection();
+    
+    // Basic connection test with ping
+    await connection.ping();
+    console.log('✅ Database ping successful');
+    
+    // Verify SSL connection (critical for Aiven)
+    const [sslResults] = await connection.query("SHOW STATUS LIKE 'Ssl_cipher'");
+    const sslCipher = sslResults[0]?.Value;
+    
+    if (!sslCipher) {
+      console.error('❌ SSL CONNECTION FAILED: No SSL cipher reported by database');
+      console.error('This indicates the SSL connection was not established');
+      console.error('Please verify your CA certificate and SSL configuration');
+      throw new Error('SSL connection verification failed - insecure connection');
+    }
+    
+    console.log('✅ SSL connection verified with cipher:', sslCipher);
+    
+    // Test a simple query
+    const [testResults] = await connection.query('SELECT 1 AS connection_test');
+    if (testResults[0].connection_test === 1) {
+      console.log('✅ Test query executed successfully');
+    }
+    
+    console.log('✅ Initial pool connection test successful');
+    return true;
+  } catch (error) {
+    console.error('❌ Initial pool connection test failed:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error stack:', error.stack);
+    
+    // More detailed error information
+    if (error.code === 'CERT_HAS_EXPIRED') {
+      console.error('CA Certificate has expired - please update it');
+    } else if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+      console.error('Unable to verify certificate - check your CA certificate');
+    } else if (error.code === 'ECONNREFUSED') {
+      console.error('Connection refused - check your database host and port');
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error('Access denied - check your database username and password');
+    }
+    
+    throw error;
+  } finally {
+    if (connection) {
+      try {
+        connection.release();
+        console.log('Connection released after initial test');
+      } catch (releaseError) {
+        console.error('Error releasing connection during initial test:', releaseError);
+      }
+    }
+  }
+};
+
+// Forward declare pool variable
+let pool;
+
+// Initialize the pool with proper error handling and method binding
+try {
+  console.log('Initializing MySQL connection pool with config:', {
+    host: poolConfig.host,
+    user: poolConfig.user,
+    database: poolConfig.database,
+    port: poolConfig.port,
+    ssl: poolConfig.ssl ? 'enabled' : 'disabled',
+    environment: process.env.NODE_ENV
+  });
+  
+  // Create the pool
+  pool = mysql.createPool(poolConfig);
+  
+  // Test if the pool has getConnection method immediately
+  if (typeof pool.getConnection !== 'function') {
+    throw new Error('pool.getConnection is not a function - MySQL pool initialized incorrectly');
+  }
+  
+  // Pool is initialized, next steps will be handled after event binding
+  
+  // Create database methods with the pool properly initialized
+  const methods = createPoolMethods(pool);
+  
+  // Attach methods directly to pool object
+  pool.query = methods.query;
+  pool.execute = methods.execute;
+  
+  // Add pool event handlers for comprehensive monitoring
+  pool.on('connection', async (connection) => {
+    console.log('New database connection established');
+    
+    // Add connection-level error handler
+    connection.on('error', (err) => {
+      console.error('Connection error:', err);
+      if (err.code === 'CERT_HAS_EXPIRED' || err.code === 'HANDSHAKE_SSL_ERROR' || handleSSLError(err)) {
+        console.error('SSL Certificate Error:', err.message);
+      }
+    });
+    
+    // Verify this specific connection has SSL if required
+    if (process.env.DB_SSL === 'true') {
+      try {
+        const isSecure = await verifyConnectionSecurity(connection);
+        if (!isSecure) {
+          console.warn('Warning: Connection may not be properly encrypted despite SSL being enabled');
+        }
+      } catch (error) {
+        console.error('Error checking SSL status on new connection:', error);
+      }
+    }
+  });
+  
+  // Run test but don't wait for it - if it fails it will log appropriately
+  testPoolConnection(pool).catch(error => {
+    console.error('Connection test failed but continuing:', error.message);
+  });
+
+  // Start monitoring systems now that pool is initialized
+  startPoolMonitoring();
+  startSSLHealthCheck();
+  
+} catch (error) {
+  console.error('Failed to initialize connection pool:', error);
+  // Create a dummy pool to prevent application crashes
+  pool = {
+    getConnection: () => Promise.reject(new Error('Connection pool not properly initialized')),
+    on: () => {},
+    execute: () => Promise.reject(new Error('Connection pool not properly initialized')),
+    query: () => Promise.reject(new Error('Connection pool not properly initialized'))
+  };
+}
+
+// Connection pool monitoring function definition
 const startPoolMonitoring = () => {
   // Monitor pool events
   pool.on('acquire', (connection) => {
@@ -248,7 +378,7 @@ const startPoolMonitoring = () => {
   }, 300000); // Check every 5 minutes
 };
 
-// SSL Health monitoring
+// SSL Health monitoring function definition
 const startSSLHealthCheck = () => {
   const checkSSLHealth = async () => {
     console.log('==========================================');
@@ -271,11 +401,11 @@ const startSSLHealthCheck = () => {
           sslVersion: sslInfo.Ssl_version,
           cipher: sslInfo.Ssl_cipher,
           verifyMode: sslInfo.Ssl_verify_mode,
-        isEncrypted: sslInfo.Ssl_cipher !== '',
-        caFileExists: process.env.DB_CA_CERT ? fs.existsSync(process.env.DB_CA_CERT) : false,
-        caCertLoaded: !!caCert,
-        sslEnabled: process.env.DB_SSL === 'true',
-        environment: process.env.NODE_ENV
+          isEncrypted: sslInfo.Ssl_cipher !== '',
+          caFileExists: process.env.DB_CA_CERT ? fs.existsSync(process.env.DB_CA_CERT) : false,
+          caCertLoaded: !!caCert,
+          sslEnabled: process.env.DB_SSL === 'true',
+          environment: process.env.NODE_ENV
         };
 
         console.log('SSL Health Status:', healthStatus);
@@ -310,7 +440,7 @@ const startSSLHealthCheck = () => {
   checkSSLHealth();
 };
 
-// Add connection error handler
+// Add enhanced connection error handler with Aiven-specific diagnostics
 pool.on('error', (err) => {
   console.error('==========================================');
   console.error('POOL CONNECTION ERROR');
@@ -324,8 +454,15 @@ pool.on('error', (err) => {
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     ssl: process.env.DB_SSL,
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString()
   });
+  
+// Add special handling for Aiven SSL errors
+  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+    console.error('Aiven connection was lost - this could be due to network issues or server timeout');
+    console.error('Recommend: Check your network connection and Aiven service status');
+  } 
 
   // Specific error type handling
   if (err.code === 'PROTOCOL_CONNECTION_LOST') {
@@ -361,32 +498,9 @@ pool.on('error', (err) => {
   console.error('==========================================');
 });
 
-// Helper function to verify connection status
-const verifyConnection = async (connection, operation) => {
-  console.log(`Verifying connection before ${operation}...`);
-  await connection.ping();  // This will throw if connection is invalid
-  return true;
-};
+// Helper function removed - using the single definition at the top
 
-// Helper function to handle SSL-related errors
-const handleSSLError = (error) => {
-  if (error.message && (
-    error.message.includes('SSL') || 
-    error.message.includes('certificate') || 
-    error.message.includes('TLS')
-  )) {
-    console.error('SSL/TLS Connection Error: This may be due to misconfigured SSL settings.');
-    console.error('For Aiven MySQL databases, ensure you have:');
-    console.error('1. Set DB_SSL=true in your .env file');
-    console.error('2. Configured the proper SSL mode in your Aiven console');
-    console.error('3. Place your CA certificate in the "certs" directory as ca.pem or similar');
-    console.error('   (or set DB_CA_CERT environment variable to your certificate file path/content)');
-    return true;
-  }
-  return false;
-};
-
-// Helper function to verify SSL/TLS connection security
+// Helper function to verify SSL/TLS connection security - moved before pool initialization
 const verifyConnectionSecurity = async (connection) => {
   try {
     // Check SSL status with proper SQL syntax (using single quotes for SQL)
@@ -427,94 +541,25 @@ const verifyConnectionSecurity = async (connection) => {
       
       return hasStrongEncryption && hasStrongHash && hasStrongMode;
     })();
-
-    // Verify TLS version compatibility
-    const isTLSVersionCompatible = (() => {
-      if (!sslInfo.Ssl_version) return false;
-      
-      const version = sslInfo.Ssl_version.toLowerCase();
-      if (version.includes('tlsv1.3')) {
-        return true; // TLS 1.3 is ideal
-      } else if (version.includes('tlsv1.2')) {
-        // TLS 1.2 is acceptable but warn if not 1.3
-        console.warn('Notice: Using TLS 1.2 - Consider upgrading to TLS 1.3 for better security');
-        return true;
-      }
-      
-      console.error('Warning: Using outdated TLS version:', sslInfo.Ssl_version);
-      return false;
-    })();
-
-    // Log simplified SSL information to reduce errors
+    
+    // Log SSL connection details for monitoring
     console.log('SSL Connection Details:', {
-      version: sslInfo.Ssl_version || 'unknown',
-      cipher: sslInfo.Ssl_cipher || 'unknown',
-      connected: sslInfo.Ssl_cipher ? 'Yes' : 'No'
+      version: sslInfo.Ssl_version || 'Not set',
+      cipher: sslInfo.Ssl_cipher || 'Not set',
+      isEncrypted: !!sslInfo.Ssl_cipher,
+      isStrongCipher: isStrongCipher,
+      cipherStrength: isStrongCipher ? 'Strong' : (sslInfo.Ssl_cipher ? 'Moderate/Weak' : 'None')
     });
     
-    // Enhanced security warnings
-    if (!isStrongCipher && process.env.NODE_ENV === 'production') {
-      console.warn('Security Warning: Weak cipher configuration detected');
-      console.warn('Current cipher:', sslInfo.Ssl_cipher);
-      console.warn('Recommended: Use ciphers with:');
-      console.warn('- AES-256 or ChaCha20 for encryption');
-      console.warn('- SHA-384 or SHA-256 for hashing');
-      console.warn('- GCM, CCM, or POLY1305 for cipher mode');
-    }
-    
-    // Log detailed security status in production
-    if (process.env.NODE_ENV === 'production') {
-      console.log('SSL Security Status:', {
-        tlsVersion: sslInfo.Ssl_version,
-        cipherStrength: isStrongCipher ? 'Strong' : 'Weak',
-        tlsVersionAcceptable: isTLSVersionCompatible,
-        verifyMode: sslInfo.Ssl_verify_mode,
-        caVerification: process.env.DB_SSL === 'true' && caCert ? 'Enabled' : 'Disabled',
-        caCertSource: caCert ? 'Loaded' : 'Not Found',
-        certificateVerification: process.env.NODE_ENV === 'production' ? 'Enforced' : 'Disabled'
-      });
-    }
-
-    // Always return true to avoid connection failures due to SSL checks
-    return true;
+    // Return true if using SSL/TLS with a cipher, false otherwise
+    return !!sslInfo.Ssl_cipher;
   } catch (error) {
-    console.error('SSL Verification Error:', error);
-    // Don't fail the connection for SSL check errors in development
-    console.warn('Continuing despite SSL verification failure');
-    return true;
+    console.error('Error verifying connection security:', error);
+    return false;
   }
 };
 
-// Add connection handler to monitor SSL status
-pool.on('connection', (connection) => {
-  console.log('New pool connection established');
-  
-  // Start monitoring if this is the first connection
-  startPoolMonitoring();
-  startSSLHealthCheck();
-  
-  // Log initial SSL configuration
-  console.log('Connection SSL Configuration:', {
-    enabled: process.env.DB_SSL === 'true',
-    rejectUnauthorized: process.env.NODE_ENV === 'production',
-    environment: process.env.NODE_ENV
-  });
-  
-  // Monitor for SSL/TLS connection errors
-  connection.on('error', (err) => {
-    if (err.code === 'CERT_HAS_EXPIRED' || err.code === 'HANDSHAKE_SSL_ERROR' || handleSSLError(err)) {
-      console.error('SSL Certificate Error:', err.message);
-      // Additional error info already provided by handleSSLError
-    }
-  });
-  
-  // Verify SSL/TLS security for all connections
-  verifyConnectionSecurity(connection).then(isSecure => {
-    if (!isSecure && process.env.DB_SSL === 'true') {
-      console.warn('Warning: Connection may not be properly encrypted despite SSL being enabled');
-    }
-  });
-});
+// Note: Connection handler is now defined only once in the pool initialization section
 
 // Test the connection using pool
 const testConnection = async () => {
@@ -683,91 +728,6 @@ const testDirectConnection = async () => {
     handleSSLError(error);
     
     return false;
-  }
-};
-
-// Execute query with enhanced error handling
-const query = async (sql, params) => {
-  // Check if we're using mock database
-  if (process.env.NODE_ENV === 'development' && process.env.MOCK_DB === 'true') {
-    console.warn('MOCK DB: Query executed:', sql);
-    return Promise.resolve([]); // Return Promise for consistency
-  }
-  
-  let connection = null;
-  try {
-    // Get connection using Promise-based approach
-    connection = await pool.getConnection().catch(connError => {
-      console.error('Connection acquisition failed:', connError);
-      throw new Error(`Failed to get database connection: ${connError.message}`);
-    });
-    
-    console.log('Pool connection acquired for query');
-    
-    // Verify SSL/TLS security for query connection
-    const isSecure = await verifyConnectionSecurity(connection);
-    if (!isSecure && process.env.DB_SSL === 'true') {
-      console.warn('Warning: Query connection may not be properly encrypted despite SSL being enabled');
-      // Continue execution but log the warning
-    }
-    
-    try {
-      // Verify connection is working with a simple ping
-      await connection.ping();
-      console.log('Connection ping successful');
-    } catch (pingError) {
-      console.error('Connection ping failed:', pingError);
-      // If connection fails ping, release and try to get a new one
-      if (connection) connection.release();
-      connection = await pool.getConnection();
-      console.log('New connection acquired after ping failure');
-    }
-    
-    console.log('Executing SQL with parameters:', {
-      sql,
-      params: JSON.stringify(params)
-    });
-    
-    // Now execute the query with direct error handling and cleaner Promise usage
-    return connection.execute(sql, params)
-      .then(([results]) => {
-        console.log('Query executed successfully, result count:', Array.isArray(results) ? results.length : 'non-array result');
-        return results;
-      })
-      .catch(execError => {
-        console.error('Query execution error:', {
-          message: execError.message,
-          code: execError.code,
-          errno: execError.errno,
-          sqlState: execError.sqlState,
-          sqlMessage: execError.sqlMessage,
-          sql: sql,
-          params: JSON.stringify(params)
-        });
-        throw execError;
-      });
-  } catch (error) {
-    console.error('Database query failed:', {
-      message: error.message,
-      code: error.code,
-      errno: error.errno,
-      sqlState: error.sqlState,
-      sqlMessage: error.sqlMessage,
-      sql: sql,
-      params: JSON.stringify(params),
-      stack: error.stack
-    });
-    throw error;
-  } finally {
-    // Always release connection in finally block
-    if (connection) {
-      try {
-        connection.release();
-        console.log('Connection released');
-      } catch (releaseError) {
-        console.error('Error releasing connection:', releaseError);
-      }
-    }
   }
 };
 
@@ -987,49 +947,105 @@ const directQuery = async (sql, params) => {
   }
 };
 
-// Define execute method for backward compatibility
-const execute = async (sql, params) => {
-  console.log('Using execute method (wraps query)');
-  // Use cleaner promise handling
-  return query(sql, params)
-    .catch(error => {
-      console.error('Execute wrapper error:', {
-        message: error.message,
-        code: error.code,
-        errno: error.errno,
-        sqlState: error.sqlState,
-        sqlMessage: error.sqlMessage,
-        sql: sql,
-        params: JSON.stringify(params)
-      });
-      
-      // Handle SSL-related errors in execute wrapper
-      handleSSLError(error);
-      
-      throw error; // Re-throw to allow handling by caller
-    });
+// All helper functions are now properly defined at the beginning of the file
+
+// Only add methods to pool if it's properly initialized
+if (pool && typeof pool.getConnection === 'function') {
+  // Add directQuery to the pool object for direct access
+  pool.directQuery = directQuery;
+  
+  // Make other functions accessible through pool for convenience
+  pool.testConnection = testConnection;
+  pool.testDirectConnection = testDirectConnection;
+  pool.beginTransaction = beginTransaction;
+  pool.commitTransaction = commitTransaction;
+  pool.rollbackTransaction = rollbackTransaction;
+} else {
+  console.error('Pool not properly initialized - skipping function bindings and monitoring');
+}
+
+// Add helpful utility function for checking database connectivity
+const checkDatabaseConnectivity = async () => {
+  try {
+    const connection = await pool.getConnection();
+    try {
+      await connection.ping();
+      console.log('Database connectivity check: Success');
+      return true;
+    } finally {
+      connection.release();
+    }
+  } catch (error) {
+    console.error('Database connectivity check: Failed', error);
+    return false;
+  }
 };
 
-// Add directQuery to the pool object for direct access
-pool.directQuery = directQuery;
+// Add a connection health checker that can be used in middleware
+const checkConnectionHealth = async () => {
+  if (!pool || typeof pool.getConnection !== 'function') {
+    console.error('Cannot check connection health - pool not properly initialized');
+    return false;
+  }
+  
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.ping();
+    return true;
+  } catch (error) {
+    console.error('Connection health check failed:', error);
+    return false;
+  } finally {
+    if (connection) {
+      try {
+        connection.release();
+      } catch (releaseError) {
+        console.error('Error releasing connection during health check:', releaseError);
+      }
+    }
+  }
+};
 
-// Make other functions accessible through pool for convenience
-pool.query = query;
-pool.execute = execute;
-pool.testConnection = testConnection;
-pool.testDirectConnection = testDirectConnection;
-pool.beginTransaction = beginTransaction;
-pool.commitTransaction = commitTransaction;
-pool.rollbackTransaction = rollbackTransaction;
-
+// Export the pool and bound methods with enhanced error handling
 module.exports = {
   pool,
-  query,
-  execute,
+  // Export methods with comprehensive safeguards to prevent "is not a function" errors
+  query: async (sql, params) => {
+    if (!pool || typeof pool.query !== 'function') {
+      console.error('Database pool not properly initialized when calling query()');
+      throw new Error('Database connection pool not properly initialized');
+    }
+    try {
+      return await pool.query(sql, params);
+    } catch (error) {
+      console.error('Error in exported query method:', error);
+      throw error;
+    }
+  },
+  
+  execute: async (sql, params) => {
+    if (!pool || typeof pool.execute !== 'function') {
+      console.error('Database pool not properly initialized when calling execute()');
+      throw new Error('Database connection pool not properly initialized');
+    }
+    try {
+      return await pool.execute(sql, params);
+    } catch (error) {
+      console.error('Error in exported execute method:', error);
+      throw error;
+    }
+  },
+  
+  checkHealth: checkConnectionHealth,
+  
+  // Export other utility functions with the same error handling pattern
   directQuery,
   testConnection,
   testDirectConnection,
   beginTransaction,
   commitTransaction,
-  rollbackTransaction
+  rollbackTransaction,
+  checkDatabaseConnectivity,
+  verifyConnection
 };

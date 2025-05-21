@@ -38,18 +38,45 @@ class UserModel {
    * @returns {Object|null} User data or null if not found
    */
   static async findByEmail(email) {
+    let connection;
     try {
-      const [users] = await pool.execute(`
+      connection = await pool.getConnection();
+      console.log('Finding user by email:', email);
+
+      const [users] = await connection.query(`
         SELECT id, username, email, password_hash, role
         FROM users
         WHERE LOWER(email) = LOWER(?)
       `, [email]);
 
+      // Enhanced error handling
+      if (!users || !Array.isArray(users)) {
+        console.log('Invalid result from findByEmail query');
+        return null;
+      }
+
+      console.log('Find by email result:', {
+        found: users.length > 0,
+        email: email
+      });
+
       // Return first user or null
       return users.length > 0 ? users[0] : null;
     } catch (error) {
-      console.error("Error finding user by email:", error.message);
+      console.error("Error finding user by email:", {
+        error: error.message,
+        stack: error.stack,
+        email: email
+      });
       throw error;
+    } finally {
+      if (connection) {
+        try {
+          connection.release();
+        } catch (releaseError) {
+          console.error('Error releasing connection:', releaseError);
+        }
+      }
     }
   }
 
@@ -59,17 +86,44 @@ class UserModel {
    * @returns {Promise<Object|null>} - The user object or null if not found
    */
   static async findByUsername(username) {
+    let connection;
     try {
-      const [users] = await pool.execute(`
+      connection = await pool.getConnection();
+      console.log('Finding user by username:', username);
+
+      const [users] = await connection.query(`
         SELECT id, username, email, password_hash, role
         FROM users
         WHERE LOWER(username) = LOWER(?)
       `, [username]);
 
+      // Enhanced error handling
+      if (!users || !Array.isArray(users)) {
+        console.log('Invalid result from findByUsername query');
+        return null;
+      }
+
+      console.log('Find by username result:', {
+        found: users.length > 0,
+        username: username
+      });
+
       return users.length > 0 ? users[0] : null;
     } catch (error) {
-      console.error("Error finding user by username:", error.message);
+      console.error("Error finding user by username:", {
+        error: error.message,
+        stack: error.stack,
+        username: username
+      });
       throw error;
+    } finally {
+      if (connection) {
+        try {
+          connection.release();
+        } catch (releaseError) {
+          console.error('Error releasing connection:', releaseError);
+        }
+      }
     }
   }
 
@@ -79,14 +133,46 @@ class UserModel {
    * @returns {Object|null} User data or null if not found
    */
   static async findById(id) {
-    const [users] = await pool.execute(`
-      SELECT id, username, email, role, created_at, updated_at
-      FROM users
-      WHERE id = ?
-    `, [id]);
+    let connection;
+    try {
+      connection = await pool.getConnection();
+      console.log('Finding user by ID:', id);
 
-    // Return first user or null
-    return users.length > 0 ? users[0] : null;
+      const [users] = await connection.query(`
+        SELECT id, username, email, role, created_at, updated_at
+        FROM users
+        WHERE id = ?
+      `, [id]);
+
+      // Enhanced error handling
+      if (!users || !Array.isArray(users)) {
+        console.log('Invalid result from findById query');
+        return null;
+      }
+
+      console.log('Find by ID result:', {
+        found: users.length > 0,
+        id: id
+      });
+
+      // Return first user or null
+      return users.length > 0 ? users[0] : null;
+    } catch (error) {
+      console.error("Error finding user by ID:", {
+        error: error.message,
+        stack: error.stack,
+        id: id
+      });
+      throw error;
+    } finally {
+      if (connection) {
+        try {
+          connection.release();
+        } catch (releaseError) {
+          console.error('Error releasing connection:', releaseError);
+        }
+      }
+    }
   }
 
   /**
@@ -134,17 +220,48 @@ class UserModel {
    * @returns {Boolean} True if user exists
    */
   static async exists(email) {
+    let connection;
     try {
-      const [result] = await pool.execute(`
+      connection = await pool.getConnection();
+      console.log('Checking if user exists:', email);
+
+      const [rows] = await connection.query(`
         SELECT COUNT(*) as count
         FROM users
         WHERE LOWER(email) = LOWER(?)
       `, [email]);
 
-      return result[0].count > 0;
+      // Enhanced error handling for COUNT result
+      if (!rows || !Array.isArray(rows) || rows.length === 0) {
+        console.log('No results returned from count query');
+        return false;
+      }
+      
+      // Safe access with fallback
+      const count = rows[0] && rows[0].count !== undefined ? parseInt(rows[0].count, 10) : 0;
+      
+      console.log('User exists check result:', {
+        email: email,
+        count: count,
+        exists: count > 0
+      });
+
+      return count > 0;
     } catch (error) {
-      console.error("Error checking if user exists:", error.message);
+      console.error("Error checking if user exists:", {
+        error: error.message,
+        stack: error.stack,
+        email: email
+      });
       throw error;
+    } finally {
+      if (connection) {
+        try {
+          connection.release();
+        } catch (releaseError) {
+          console.error('Error releasing connection:', releaseError);
+        }
+      }
     }
   }
 
