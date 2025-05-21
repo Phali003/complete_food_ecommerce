@@ -1,12 +1,18 @@
-import { forgotPassword } from '../../controllers/authController.js';
+const { forgotPassword } = require('../../controllers/authController');
 
 /**
  * API route for requesting a password reset email
  * @param {Object} req - HTTP request object
  * @param {Object} res - HTTP response object
  */
-export default async (req, res) => {
+module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({
       success: false,
-      message: 'Metho
+      message: 'Method not allowed'
+    });
+  }
+
+  // Call the forgot password controller
+  return forgotPassword(req, res);
+};

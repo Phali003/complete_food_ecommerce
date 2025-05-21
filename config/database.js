@@ -1,61 +1,242 @@
+/**
+ * Database Configuration Module
+ * Handles MySQL database connection pool management with proper error handling
+ */
+
+// Required modules for database connectivity and SSL
 const mysql = require('mysql2/promise');
-require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const dotenv = require('dotenv');
 
-/**
- * Simple database connection module with proper SSL handling
- * Specially configured for Aiven MySQL Cloud
- */
+// Load environment variables
+dotenv.config();
 
 console.log('Initializing database connection module...');
 
-// Load and validate SSL certificate - critical for Aiven MySQL
-let caCert;
-try {
-  // Look for certificate in the certs directory
-  const certPath = path.join(process.cwd(), 'certs', 'ca.pem');
+// -----------------------------------------------
+// Helper Functions - Defined BEFORE being used
+// -----------------------------------------------
+
+// Connection pool monitoring function definition - moved to the top to avoid initialization issues
+const startPoolMonitoring = () => {
+  console.log('Initializing pool monitoring...');
   
-  if (!fs.existsSync(certPath)) {
-    throw new Error(`Certificate file not found at ${certPath}. Please add your Aiven CA certificate.`);
+  try {
+    // Safety check - make sure pool exists and has proper methods
+    if (!pool || typeof pool.on !== 'function') {
+      console.error('Cannot start pool monitoring: pool is not properly initialized');
+      return false;
+    }
+    
+    // Monitor pool events with safe binding
+    safeBindEvent('acquire', (connection) => {
+      console.log('Connection %d acquired', connection.threadId);
+    });
+
+    safeBindEvent('release', (connection) => {
+      console.log('Connection %d released', connection.threadId);
+    });
+
+    safeBindEvent('enqueue', () => {
+      console.warn('Waiting for available connection slot');
+    });
+
+    // Monitor pool status periodically
+    const statusInterval = setInterval(async () => {
+      try {
+        // Use async/await to check pool status
+        const status = await (async () => {
+          if (!pool || !pool.pool) return 'Pool not initialized';
+          
+          return {
+            threadId: pool.pool.threadId,
+            connectionLimit: pool.config?.connectionLimit,
+            queueLimit: pool.config?.queueLimit,
+            waitForConnections: pool.config?.waitForConnections
+          };
+        })();
+        
+        console.log('Pool Status:', status);
+      } catch (error) {
+        console.error('Error checking pool status:', error);
+      }
+    }, 300000); // Check every 5 minutes
+    
+    if (process.env.NODE_ENV !== 'production') {
+      // Clean up interval on process exit in development
+      process.on('SIGINT', () => {
+        clearInterval(statusInterval);
+        console.log('Pool monitoring stopped due to process termination');
+      });
+    }
+    
+    console.log('Pool monitoring initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to initialize pool monitoring:', error);
+    return false;
+  }
+};
+
+// Define SSL monitoring function before it's used
+const startSSLMonitoring = () => {
+  console.log('Initializing SSL monitoring...');
+  
+  // Function to check SSL health
+  const checkSSLHealth = async () => {
+    console.log('Running SSL health check...');
+    console.log('==========================================');
+    
+    try {
+      if (!pool) {
+        console.error('Cannot check SSL health: pool is not initialized');
+        return;
+      }
+      
+      const connection = await pool.getConnection();
+      
+      try {
+        // Check SSL status
+        const [sslInfo] = await connection.query(`
+          SHOW STATUS WHERE Variable_name IN (
+            'Ssl_version', 'Ssl_cipher', 'Ssl_verify_mode'
+          )
+        `);
+        
+        // Transform results into a more usable format
+        const sslStatus = {};
+        sslInfo.forEach(row => {
+          sslStatus[row.Variable_name] = row.Value;
+        });
+        
+        // Verify SSL configuration
+        const healthStatus = {
+          sslVersion: sslStatus.Ssl_version,
+          cipher: sslStatus.Ssl_cipher,
+          verifyMode: sslStatus.Ssl_verify_mode,
+          isEncrypted: sslStatus.Ssl_cipher !== '',
+          caFileExists: process.env.DB_CA_CERT ? fs.existsSync(process.env.DB_CA_CERT) : false,
+          caCertLoaded: !!caCert,
+          sslEnabled: process.env.DB_SSL === 'true',
+          environment: process.env.NODE_ENV
+        };
+
+        console.log('SSL Health Status:', healthStatus);
+
+        // Check for potential issues
+        if (!healthStatus.isEncrypted && process.env.DB_SSL === 'true') {
+          console.error('WARNING: Connection not encrypted despite SSL being enabled');
+        }
+        if (process.env.NODE_ENV === 'production' && !healthStatus.caCertLoaded) {
+          console.error('WARNING: No CA certificate loaded for production environment');
+        }
+        if (healthStatus.sslVersion && !healthStatus.sslVersion.match(/TLSv1\.[23]/)) {
+          console.error('WARNING: Using older TLS version:', healthStatus.sslVersion);
+        }
+
+      } catch (error) {
+        console.error('SSL health check query failed:', error);
+      } finally {
+        if (connection) {
+          try {
+            connection.release();
+          } catch (releaseError) {
+            console.error('Error releasing connection during SSL health check:', releaseError);
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error('SSL health check failed - could not acquire connection:', error);
+    }
+
+    console.log('==========================================');
+  };
+
+  // Run health check every 15 minutes
+  const healthCheckInterval = setInterval(checkSSLHealth, 900000);
+  
+  // Run initial check asynchronously to avoid blocking
+  setTimeout(checkSSLHealth, 5000);
+  
+  // Make sure we don't orphan interval
+  if (process.env.NODE_ENV !== 'production') {
+    process.on('SIGINT', () => {
+      clearInterval(healthCheckInterval);
+      console.log('SSL monitoring stopped due to process termination');
+    });
   }
   
-  console.log(`Reading certificate from ${certPath}...`);
-  caCert = fs.readFileSync(certPath, 'utf8');
-  
-  // Simple validation
-  if (!caCert.includes('-----BEGIN CERTIFICATE-----') || 
-      !caCert.includes('-----END CERTIFICATE-----')) {
-    throw new Error('Invalid certificate format: Missing BEGIN/END markers');
-  }
-  
-  console.log('SSL certificate loaded successfully:', {
-    size: caCert.length,
-    valid: true
-  });
-} catch (error) {
-  console.error('❌ CRITICAL ERROR - Failed to load SSL certificate:', error.message);
-  console.error('Aiven MySQL requires SSL connection with a valid CA certificate.');
-  console.error('Please ensure the CA certificate file exists at: ./certs/ca.pem');
-  
-  if (process.env.NODE_ENV === 'production') {
-    console.error('Exiting application due to missing SSL certificate in production environment');
-    process.exit(1); // Exit in production since we cannot connect securely
+  console.log('SSL monitoring initialized successfully');
+  return true;
+};
+
+// Helper for safely binding events to pool
+const safeBindEvent = (eventName, handler) => {
+  if (pool && typeof pool.on === 'function') {
+    try {
+      pool.on(eventName, handler);
+      console.log(`Bound event handler for ${eventName}`);
+    } catch (error) {
+      console.error(`Failed to bind event handler for ${eventName}:`, error);
+    }
   } else {
-    console.warn('Continuing without SSL certificate in development mode, but connection will likely fail');
+    console.error(`Cannot bind ${eventName} event: pool is not properly initialized`);
+  }
+};
+
+/**
+ * Load SSL certificate for database connection
+ * @returns {string|null} Certificate content or null if not available
+ */
+function loadSSLCertificate() {
+  try {
+    // Look for certificate in the certs directory
+    const certPath = path.join(process.cwd(), 'certs', 'ca.pem');
+    console.log('Reading certificate from', certPath + '...');
+    
+    if (!fs.existsSync(certPath)) {
+      console.warn('Certificate file not found at', certPath);
+      return null;
+    }
+    
+    const caCert = fs.readFileSync(certPath, 'utf8');
+    
+    // Simple validation
+    const isValid = caCert.includes('-----BEGIN CERTIFICATE-----') && 
+                    caCert.includes('-----END CERTIFICATE-----');
+    
+    console.log('SSL certificate loaded successfully:', {
+      size: caCert.length,
+      valid: isValid
+    });
+    return isValid ? caCert : null;
+  } catch (error) {
+    console.error('Failed to load SSL certificate:', error);
+    return null;
   }
 }
 
-// Log database configuration (without password)
+// Proceed with database initialization
+
+// -----------------------------------------------
+// Load CA Certificate for SSL
+// -----------------------------------------------
+const caCert = loadSSLCertificate();
+
+// -----------------------------------------------
+// Database Pool Configuration
+// -----------------------------------------------
 console.log('Database Configuration:', {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306,
-  ssl: process.env.DB_SSL || 'true'
+  port: process.env.DB_PORT,
+  ssl: process.env.DB_SSL
 });
 
-// Simplified pool configuration for Aiven MySQL
+// Configure pool options with only valid mysql2 options
 const poolConfig = {
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -63,43 +244,225 @@ const poolConfig = {
   database: process.env.DB_NAME,
   port: process.env.DB_PORT || 3306,
   
-  // Connection pool settings optimized for cloud hosting
+  // Connection pool settings
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
   enableKeepAlive: true,
   
-  // Increase timeouts for cloud database
+  // Increase timeouts for cloud database (use only supported options)
   connectTimeout: 60000, // 60 seconds
-  acquireTimeout: 60000,
-  timeout: 60000,
   
-  // SSL configuration optimized for Aiven MySQL
-  ssl: {
-    // Required for Aiven MySQL
+  // SSL configuration optimized for cloud hosting
+  ssl: process.env.DB_SSL === 'true' ? {
     rejectUnauthorized: true,
-    // Add CA certificate directly
     ca: caCert,
-    // Use modern TLS version
     minVersion: 'TLSv1.2'
-  },
+  } : undefined,
   
   // Additional settings for stability
   multipleStatements: false,
-  dateStrings: true,
-  timezone: 'UTC'
+  dateStrings: true
 };
 
-// Add warning for development mode
-if (process.env.NODE_ENV !== 'production' && process.env.DB_SSL === 'true') {
-  console.warn('------------------------------------------------------------------');
-  console.warn('WARNING: SSL certificate verification is disabled in development mode');
-  console.warn('This is to handle self-signed certificates in Aiven MySQL connections');
-  console.warn('This configuration is NOT secure and should NOT be used in production');
-  console.warn('------------------------------------------------------------------');
+// -----------------------------------------------
+// Pool Initialization
+// -----------------------------------------------
+let pool = null;
+
+/**
+ * Initialize the database connection pool
+ * @returns {Promise<Object>} The connection pool
+ */
+async function initializePool() {
+  try {
+    // If pool is already initialized, return it
+    if (pool) {
+      console.log('Pool already initialized, reusing existing pool');
+      return pool;
+    }
+    
+    console.log('Initializing MySQL connection pool with config:', {
+      host: poolConfig.host,
+      user: poolConfig.user,
+      database: poolConfig.database,
+      port: poolConfig.port,
+      ssl: poolConfig.ssl ? 'enabled' : 'disabled',
+      environment: process.env.NODE_ENV
+    });
+    
+    // Create the pool
+    try {
+      pool = mysql.createPool(poolConfig);
+      console.log('MySQL connection pool created successfully');
+    } catch (poolCreationError) {
+      console.error('Failed to create connection pool:', poolCreationError);
+      throw poolCreationError;
+    }
+    
+    // Test connection immediately
+    console.log('⏳ Testing initial database connection...');
+    let connection;
+    try {
+      // Get connection from pool
+      connection = await pool.getConnection();
+      
+      // Test connection with ping
+      await connection.ping();
+      console.log('✅ Database connection test successful');
+        
+      // Check SSL status if enabled
+      if (process.env.DB_SSL === 'true') {
+        const [rows] = await connection.query("SHOW STATUS LIKE 'Ssl_cipher'");
+        const cipher = rows[0] ? rows[0].Value : null;
+          
+        if (!cipher) {
+          console.warn('⚠️ WARNING: SSL may not be enabled despite configuration');
+        } else {
+          console.log('✅ SSL connection verified with cipher:', cipher);
+        }
+      }
+    } catch (error) {
+      // Handle both connection acquisition and ping/query errors
+      if (error.code === 'ECONNREFUSED' || error.message.includes('getConnection')) {
+        console.error('❌ Failed to acquire connection for initial test:', error);
+      } else {
+        console.error('❌ Database connection test failed:', error);
+      }
+      throw error;
+    } finally {
+      // Ensure connection is always released if it exists
+      if (connection) {
+        connection.release();
+        connection = null; // Ensure connection is nullified after release
+      }
+    }
+
+    // Start monitoring AFTER pool is successfully initialized
+    startPoolMonitoring();
+    startSSLMonitoring();
+    
+    return pool;
+  } catch (error) {
+    console.error('Failed to initialize connection pool:', error);
+    // Reset pool to null if initialization failed
+    pool = null;
+    throw error;
+  }
 }
 
-// Define helper functions first
+// -----------------------------------------------
+// Database query helpers
+// -----------------------------------------------
+
+/**
+ * Execute a database query with proper error handling
+ * @param {string} sql - SQL query to execute
+ * @param {Array} params - Query parameters
+ * @returns {Promise<Array>} Query results
+ */
+async function query(sql, params = []) {
+  if (!pool) {
+    try {
+      await initializePool();
+    } catch (error) {
+      throw new Error(`Failed to initialize pool for query: ${error.message}`);
+    }
+  }
+  
+  try {
+    const [results] = await pool.query(sql, params);
+    return results;
+  } catch (error) {
+    console.error('Database query error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Execute a prepared statement with proper error handling
+ * @param {string} sql - SQL query to execute
+ * @param {Array} params - Query parameters
+ * @returns {Promise<Array>} Query results
+ */
+async function execute(sql, params = []) {
+  if (!pool) {
+    try {
+      await initializePool();
+    } catch (error) {
+      throw new Error(`Failed to initialize pool for execute: ${error.message}`);
+    }
+  }
+  
+  try {
+    const [results] = await pool.execute(sql, params);
+    return results;
+  } catch (error) {
+    console.error('Database execute error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get a connection from the pool
+ * @returns {Promise<Object>} Database connection
+ */
+async function getConnection() {
+  if (!pool) {
+    try {
+      await initializePool();
+    } catch (error) {
+      throw new Error(`Failed to initialize pool for connection: ${error.message}`);
+    }
+  }
+  
+  try {
+    return await pool.getConnection();
+  } catch (error) {
+    console.error('Error getting connection from pool:', error);
+    throw error;
+  }
+}
+
+// Define health check function before exporting
+const checkConnectionHealth = async () => {
+  if (!pool || typeof pool.getConnection !== 'function') {
+    console.error('Cannot check connection health - pool not properly initialized');
+    return false;
+  }
+  
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    await connection.ping();
+    return true;
+  } catch (error) {
+    console.error('Connection health check failed:', error);
+    return false;
+  } finally {
+    if (connection) {
+      try {
+        connection.release();
+      } catch (releaseError) {
+        console.error('Error releasing connection during health check:', releaseError);
+      }
+    }
+  }
+};
+
+// Define connection verification function before exporting
+const verifyConnection = async (connection, operation = 'operation') => {
+  console.log(`Verifying connection before ${operation}...`);
+  try {
+    await connection.ping();  // This will throw if connection is invalid
+    return true;
+  } catch (error) {
+    console.error(`Connection verification failed for ${operation}:`, error);
+    throw error;
+  }
+};
+
+// Helper for SSL error handling (needed for some other functions)
 const handleSSLError = (error) => {
   if (error.message && (
     error.message.includes('SSL') || 
@@ -117,17 +480,129 @@ const handleSSLError = (error) => {
   return false;
 };
 
-// Connection verification function
-const verifyConnection = async (connection, operation = 'operation') => {
-  console.log(`Verifying connection before ${operation}...`);
+// Helper function to verify SSL/TLS connection security
+const verifyConnectionSecurity = async (connection) => {
   try {
-    await connection.ping();  // This will throw if connection is invalid
-    return true;
+    // Check SSL status with proper SQL syntax (using single quotes for SQL)
+    const [sslStatus] = await connection.query("SHOW STATUS LIKE 'Ssl%'");
+    
+    // Create SSL info object with proper Promise handling
+    const sslInfo = await Promise.resolve().then(() => {
+      const info = {};
+      if (sslStatus && Array.isArray(sslStatus)) {
+        sslStatus.forEach(row => {
+          if (row && row.Variable_name) {
+            info[row.Variable_name] = row.Value;
+          }
+        });
+      }
+      return info;
+    });
+
+    // Enhanced cipher strength verification
+    const isStrongCipher = (() => {
+      if (!sslInfo.Ssl_cipher) return false;
+      
+      // Check for strong encryption algorithms
+      const hasStrongEncryption = 
+        sslInfo.Ssl_cipher.includes('AES-256') ||
+        sslInfo.Ssl_cipher.includes('CHACHA20');
+      
+      // Check for strong hash algorithms
+      const hasStrongHash =
+        sslInfo.Ssl_cipher.includes('SHA384') ||
+        sslInfo.Ssl_cipher.includes('SHA256');
+      
+      // Check for modern cipher modes
+      const hasStrongMode =
+        sslInfo.Ssl_cipher.includes('GCM') ||
+        sslInfo.Ssl_cipher.includes('CCM') ||
+        sslInfo.Ssl_cipher.includes('POLY1305');
+      
+      return hasStrongEncryption && hasStrongHash && hasStrongMode;
+    })();
+    
+    // Log SSL connection details for monitoring
+    console.log('SSL Connection Details:', {
+      version: sslInfo.Ssl_version || 'Not set',
+      cipher: sslInfo.Ssl_cipher || 'Not set',
+      isEncrypted: !!sslInfo.Ssl_cipher,
+      isStrongCipher: isStrongCipher,
+      cipherStrength: isStrongCipher ? 'Strong' : (sslInfo.Ssl_cipher ? 'Moderate/Weak' : 'None')
+    });
+    
+    // Return true if using SSL/TLS with a cipher, false otherwise
+    return !!sslInfo.Ssl_cipher;
   } catch (error) {
-    console.error(`Connection verification failed for ${operation}:`, error);
-    throw error;
+    console.error('Error verifying connection security:', error);
+    return false;
   }
 };
+
+// Factory for creating database method wrappers
+
+// Test function for pool connection
+const testPoolConnection = async (pool) => {
+  let connection;
+  try {
+    console.log('⏳ Testing initial database connection...');
+    connection = await pool.getConnection();
+    
+    // Basic connection test with ping
+    await connection.ping();
+    console.log('✅ Database ping successful');
+    
+    // Verify SSL connection (critical for Aiven)
+    const [sslResults] = await connection.query("SHOW STATUS LIKE 'Ssl_cipher'");
+    const sslCipher = sslResults[0]?.Value;
+    
+    if (!sslCipher) {
+      console.error('❌ SSL CONNECTION FAILED: No SSL cipher reported by database');
+      console.error('This indicates the SSL connection was not established');
+      console.error('Please verify your CA certificate and SSL configuration');
+      throw new Error('SSL connection verification failed - insecure connection');
+    }
+    
+    console.log('✅ SSL connection verified with cipher:', sslCipher);
+    
+    // Test a simple query
+    const [testResults] = await connection.query('SELECT 1 AS connection_test');
+    if (testResults[0].connection_test === 1) {
+      console.log('✅ Test query executed successfully');
+    }
+    
+    console.log('✅ Initial pool connection test successful');
+    return true;
+  } catch (error) {
+    console.error('❌ Initial pool connection test failed:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error stack:', error.stack);
+    
+    // More detailed error information
+    if (error.code === 'CERT_HAS_EXPIRED') {
+      console.error('CA Certificate has expired - please update it');
+    } else if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+      console.error('Unable to verify certificate - check your CA certificate');
+    } else if (error.code === 'ECONNREFUSED') {
+      console.error('Connection refused - check your database host and port');
+    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+      console.error('Access denied - check your database username and password');
+    }
+    
+    throw error;
+  } finally {
+    if (connection) {
+      try {
+        connection.release();
+        console.log('Connection released after initial test');
+      } catch (releaseError) {
+        console.error('Error releasing connection during initial test:', releaseError);
+      }
+    }
+  }
+};
+
+// Other helper functions for database operations
 
 // Factory to create database methods with proper connection handling
 const createPoolMethods = (pool) => {
@@ -204,244 +679,10 @@ const createPoolMethods = (pool) => {
   return { query, execute };
 };
 
-// Define test function outside of the try block
-const testPoolConnection = async (pool) => {
-  let connection;
-  try {
-    console.log('⏳ Testing initial database connection...');
-    connection = await pool.getConnection();
-    
-    // Basic connection test with ping
-    await connection.ping();
-    console.log('✅ Database ping successful');
-    
-    // Verify SSL connection (critical for Aiven)
-    const [sslResults] = await connection.query("SHOW STATUS LIKE 'Ssl_cipher'");
-    const sslCipher = sslResults[0]?.Value;
-    
-    if (!sslCipher) {
-      console.error('❌ SSL CONNECTION FAILED: No SSL cipher reported by database');
-      console.error('This indicates the SSL connection was not established');
-      console.error('Please verify your CA certificate and SSL configuration');
-      throw new Error('SSL connection verification failed - insecure connection');
-    }
-    
-    console.log('✅ SSL connection verified with cipher:', sslCipher);
-    
-    // Test a simple query
-    const [testResults] = await connection.query('SELECT 1 AS connection_test');
-    if (testResults[0].connection_test === 1) {
-      console.log('✅ Test query executed successfully');
-    }
-    
-    console.log('✅ Initial pool connection test successful');
-    return true;
-  } catch (error) {
-    console.error('❌ Initial pool connection test failed:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Error stack:', error.stack);
-    
-    // More detailed error information
-    if (error.code === 'CERT_HAS_EXPIRED') {
-      console.error('CA Certificate has expired - please update it');
-    } else if (error.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
-      console.error('Unable to verify certificate - check your CA certificate');
-    } else if (error.code === 'ECONNREFUSED') {
-      console.error('Connection refused - check your database host and port');
-    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
-      console.error('Access denied - check your database username and password');
-    }
-    
-    throw error;
-  } finally {
-    if (connection) {
-      try {
-        connection.release();
-        console.log('Connection released after initial test');
-      } catch (releaseError) {
-        console.error('Error releasing connection during initial test:', releaseError);
-      }
-    }
-  }
-};
-
-// Forward declare pool variable
-let pool;
-
-// Initialize the pool with proper error handling and method binding
-try {
-  console.log('Initializing MySQL connection pool with config:', {
-    host: poolConfig.host,
-    user: poolConfig.user,
-    database: poolConfig.database,
-    port: poolConfig.port,
-    ssl: poolConfig.ssl ? 'enabled' : 'disabled',
-    environment: process.env.NODE_ENV
-  });
-  
-  // Create the pool
-  pool = mysql.createPool(poolConfig);
-  
-  // Test if the pool has getConnection method immediately
-  if (typeof pool.getConnection !== 'function') {
-    throw new Error('pool.getConnection is not a function - MySQL pool initialized incorrectly');
-  }
-  
-  // Pool is initialized, next steps will be handled after event binding
-  
-  // Create database methods with the pool properly initialized
-  const methods = createPoolMethods(pool);
-  
-  // Attach methods directly to pool object
-  pool.query = methods.query;
-  pool.execute = methods.execute;
-  
-  // Add pool event handlers for comprehensive monitoring
-  pool.on('connection', async (connection) => {
-    console.log('New database connection established');
-    
-    // Add connection-level error handler
-    connection.on('error', (err) => {
-      console.error('Connection error:', err);
-      if (err.code === 'CERT_HAS_EXPIRED' || err.code === 'HANDSHAKE_SSL_ERROR' || handleSSLError(err)) {
-        console.error('SSL Certificate Error:', err.message);
-      }
-    });
-    
-    // Verify this specific connection has SSL if required
-    if (process.env.DB_SSL === 'true') {
-      try {
-        const isSecure = await verifyConnectionSecurity(connection);
-        if (!isSecure) {
-          console.warn('Warning: Connection may not be properly encrypted despite SSL being enabled');
-        }
-      } catch (error) {
-        console.error('Error checking SSL status on new connection:', error);
-      }
-    }
-  });
-  
-  // Run test but don't wait for it - if it fails it will log appropriately
-  testPoolConnection(pool).catch(error => {
-    console.error('Connection test failed but continuing:', error.message);
-  });
-
-  // Start monitoring systems now that pool is initialized
-  startPoolMonitoring();
-  startSSLHealthCheck();
-  
-} catch (error) {
-  console.error('Failed to initialize connection pool:', error);
-  // Create a dummy pool to prevent application crashes
-  pool = {
-    getConnection: () => Promise.reject(new Error('Connection pool not properly initialized')),
-    on: () => {},
-    execute: () => Promise.reject(new Error('Connection pool not properly initialized')),
-    query: () => Promise.reject(new Error('Connection pool not properly initialized'))
-  };
-}
-
-// Connection pool monitoring function definition
-const startPoolMonitoring = () => {
-  // Monitor pool events
-  pool.on('acquire', (connection) => {
-    console.log('Connection %d acquired', connection.threadId);
-  });
-
-  pool.on('release', (connection) => {
-    console.log('Connection %d released', connection.threadId);
-  });
-
-  pool.on('enqueue', () => {
-    console.warn('Waiting for available connection slot');
-  });
-
-  // Monitor pool status periodically
-  setInterval(async () => {
-    try {
-      // Use async/await to check pool status
-      const status = await (async () => {
-        if (!pool.pool) return 'Pool not initialized';
-        
-        return {
-          threadId: pool.pool.threadId,
-          connectionLimit: pool.config.connectionLimit,
-          queueLimit: pool.config.queueLimit,
-          waitForConnections: pool.config.waitForConnections
-        };
-      })();
-      
-      console.log('Pool Status:', status);
-    } catch (error) {
-      console.error('Error checking pool status:', error);
-    }
-  }, 300000); // Check every 5 minutes
-};
-
-// SSL Health monitoring function definition
-const startSSLHealthCheck = () => {
-  const checkSSLHealth = async () => {
-    console.log('==========================================');
-    console.log('SSL HEALTH CHECK');
-    console.log('==========================================');
-
-    try {
-      const connection = await pool.getConnection();
-      
-      try {
-        // Check SSL Status
-        const [sslStatus] = await connection.query("SHOW STATUS LIKE 'Ssl%'");
-        const sslInfo = {};
-        sslStatus.forEach(row => {
-          sslInfo[row.Variable_name] = row.Value;
-        });
-
-        // Verify SSL configuration
-        const healthStatus = {
-          sslVersion: sslInfo.Ssl_version,
-          cipher: sslInfo.Ssl_cipher,
-          verifyMode: sslInfo.Ssl_verify_mode,
-          isEncrypted: sslInfo.Ssl_cipher !== '',
-          caFileExists: process.env.DB_CA_CERT ? fs.existsSync(process.env.DB_CA_CERT) : false,
-          caCertLoaded: !!caCert,
-          sslEnabled: process.env.DB_SSL === 'true',
-          environment: process.env.NODE_ENV
-        };
-
-        console.log('SSL Health Status:', healthStatus);
-
-        // Check for potential issues
-        if (!healthStatus.isEncrypted && process.env.DB_SSL === 'true') {
-          console.error('WARNING: Connection not encrypted despite SSL being enabled');
-        }
-        if (process.env.NODE_ENV === 'production' && !healthStatus.caCertLoaded) {
-          console.error('WARNING: No CA certificate loaded for production environment');
-        }
-        if (healthStatus.sslVersion && !healthStatus.sslVersion.match(/TLSv1\.[23]/)) {
-          console.error('WARNING: Using older TLS version:', healthStatus.sslVersion);
-        }
-
-      } catch (error) {
-        console.error('SSL health check query failed:', error);
-      } finally {
-        connection.release();
-      }
-
-    } catch (error) {
-      console.error('SSL health check failed - could not acquire connection:', error);
-    }
-
-    console.log('==========================================');
-  };
-
-  // Run health check every 15 minutes
-  setInterval(checkSSLHealth, 900000);
-  // Run initial check
-  checkSSLHealth();
-};
-
 // Add enhanced connection error handler with Aiven-specific diagnostics
-pool.on('error', (err) => {
+// Only add the event handler if pool is initialized
+if (pool) {
+  pool.on('error', (err) => {
   console.error('==========================================');
   console.error('POOL CONNECTION ERROR');
   console.error('==========================================');
@@ -496,68 +737,10 @@ pool.on('error', (err) => {
   }
 
   console.error('==========================================');
-});
+  });
+}
 
-// Helper function removed - using the single definition at the top
-
-// Helper function to verify SSL/TLS connection security - moved before pool initialization
-const verifyConnectionSecurity = async (connection) => {
-  try {
-    // Check SSL status with proper SQL syntax (using single quotes for SQL)
-    const [sslStatus] = await connection.query("SHOW STATUS LIKE 'Ssl%'");
-    
-    // Create SSL info object with proper Promise handling
-    const sslInfo = await Promise.resolve().then(() => {
-      const info = {};
-      if (sslStatus && Array.isArray(sslStatus)) {
-        sslStatus.forEach(row => {
-          if (row && row.Variable_name) {
-            info[row.Variable_name] = row.Value;
-          }
-        });
-      }
-      return info;
-    });
-
-    // Enhanced cipher strength verification
-    const isStrongCipher = (() => {
-      if (!sslInfo.Ssl_cipher) return false;
-      
-      // Check for strong encryption algorithms
-      const hasStrongEncryption = 
-        sslInfo.Ssl_cipher.includes('AES-256') ||
-        sslInfo.Ssl_cipher.includes('CHACHA20');
-      
-      // Check for strong hash algorithms
-      const hasStrongHash =
-        sslInfo.Ssl_cipher.includes('SHA384') ||
-        sslInfo.Ssl_cipher.includes('SHA256');
-      
-      // Check for modern cipher modes
-      const hasStrongMode =
-        sslInfo.Ssl_cipher.includes('GCM') ||
-        sslInfo.Ssl_cipher.includes('CCM') ||
-        sslInfo.Ssl_cipher.includes('POLY1305');
-      
-      return hasStrongEncryption && hasStrongHash && hasStrongMode;
-    })();
-    
-    // Log SSL connection details for monitoring
-    console.log('SSL Connection Details:', {
-      version: sslInfo.Ssl_version || 'Not set',
-      cipher: sslInfo.Ssl_cipher || 'Not set',
-      isEncrypted: !!sslInfo.Ssl_cipher,
-      isStrongCipher: isStrongCipher,
-      cipherStrength: isStrongCipher ? 'Strong' : (sslInfo.Ssl_cipher ? 'Moderate/Weak' : 'None')
-    });
-    
-    // Return true if using SSL/TLS with a cipher, false otherwise
-    return !!sslInfo.Ssl_cipher;
-  } catch (error) {
-    console.error('Error verifying connection security:', error);
-    return false;
-  }
-};
+// Connection management functions
 
 // Note: Connection handler is now defined only once in the pool initialization section
 
@@ -577,6 +760,21 @@ const testConnection = async () => {
   let connection;
   try {
     console.log('Testing database connection...');
+    
+    // Initialize pool if it doesn't exist yet
+    if (!pool) {
+      try {
+        console.log('Pool not initialized yet, initializing...');
+        await initializePool();
+        if (!pool) {
+          throw new Error('Pool initialization failed');
+        }
+      } catch (initError) {
+        console.error('Failed to initialize database pool:', initError);
+        return false;
+      }
+    }
+    
     // Get a connection from the pool
     connection = await pool.getConnection();
     console.log('Test connection acquired from pool');
@@ -947,33 +1145,36 @@ const directQuery = async (sql, params) => {
   }
 };
 
-// All helper functions are now properly defined at the beginning of the file
+// Additional utility functions for database operations
 
-// Only add methods to pool if it's properly initialized
-if (pool && typeof pool.getConnection === 'function') {
-  // Add directQuery to the pool object for direct access
-  pool.directQuery = directQuery;
-  
-  // Make other functions accessible through pool for convenience
-  pool.testConnection = testConnection;
-  pool.testDirectConnection = testDirectConnection;
-  pool.beginTransaction = beginTransaction;
-  pool.commitTransaction = commitTransaction;
-  pool.rollbackTransaction = rollbackTransaction;
-} else {
-  console.error('Pool not properly initialized - skipping function bindings and monitoring');
-}
+// The initializePool function handles all pool configuration and monitoring
 
 // Add helpful utility function for checking database connectivity
 const checkDatabaseConnectivity = async () => {
   try {
+    // Initialize pool if it doesn't exist yet
+    if (!pool) {
+      try {
+        console.log('Pool not initialized yet, initializing for connectivity check...');
+        await initializePool();
+        if (!pool) {
+          throw new Error('Pool initialization failed during connectivity check');
+        }
+      } catch (initError) {
+        console.error('Failed to initialize database pool during connectivity check:', initError);
+        return false;
+      }
+    }
+    
     const connection = await pool.getConnection();
     try {
       await connection.ping();
       console.log('Database connectivity check: Success');
       return true;
     } finally {
-      connection.release();
+      if (connection) {
+        connection.release();
+      }
     }
   } catch (error) {
     console.error('Database connectivity check: Failed', error);
@@ -981,65 +1182,18 @@ const checkDatabaseConnectivity = async () => {
   }
 };
 
-// Add a connection health checker that can be used in middleware
-const checkConnectionHealth = async () => {
-  if (!pool || typeof pool.getConnection !== 'function') {
-    console.error('Cannot check connection health - pool not properly initialized');
-    return false;
-  }
-  
-  let connection;
-  try {
-    connection = await pool.getConnection();
-    await connection.ping();
-    return true;
-  } catch (error) {
-    console.error('Connection health check failed:', error);
-    return false;
-  } finally {
-    if (connection) {
-      try {
-        connection.release();
-      } catch (releaseError) {
-        console.error('Error releasing connection during health check:', releaseError);
-      }
-    }
-  }
-};
-
-// Export the pool and bound methods with enhanced error handling
+// -----------------------------------------------
+// Module Exports
+// -----------------------------------------------
 module.exports = {
-  pool,
-  // Export methods with comprehensive safeguards to prevent "is not a function" errors
-  query: async (sql, params) => {
-    if (!pool || typeof pool.query !== 'function') {
-      console.error('Database pool not properly initialized when calling query()');
-      throw new Error('Database connection pool not properly initialized');
-    }
-    try {
-      return await pool.query(sql, params);
-    } catch (error) {
-      console.error('Error in exported query method:', error);
-      throw error;
-    }
-  },
+  initializePool,
+  query,
+  execute,
+  getConnection,
+  pool: () => pool,
   
-  execute: async (sql, params) => {
-    if (!pool || typeof pool.execute !== 'function') {
-      console.error('Database pool not properly initialized when calling execute()');
-      throw new Error('Database connection pool not properly initialized');
-    }
-    try {
-      return await pool.execute(sql, params);
-    } catch (error) {
-      console.error('Error in exported execute method:', error);
-      throw error;
-    }
-  },
-  
+  // Utility functions for database operations
   checkHealth: checkConnectionHealth,
-  
-  // Export other utility functions with the same error handling pattern
   directQuery,
   testConnection,
   testDirectConnection,

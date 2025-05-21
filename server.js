@@ -503,11 +503,13 @@ app.use((err, req, res, next) => {
 
 const startServer = async () => {
   try {
+    console.log("Checking database connection before starting server...");
     const connected = await testConnection();
     if (!connected) {
       console.error("Failed to connect to MySQL database");
       process.exit(1);
     }
+    console.log("Database connection successful");
 
     app.set("strict routing", true);
     app.set("case sensitive routing", true);

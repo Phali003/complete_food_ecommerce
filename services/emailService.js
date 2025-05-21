@@ -1,10 +1,37 @@
 /**
  * Email Service
  * Handles email sending using Resend.com
+ * 
+ * Modified to use CommonJS for compatibility with production environment
  */
 
-import { Resend } from 'resend';
-import dotenv from 'dotenv';
+// Use CommonJS require syntax instead of ES module imports
+let Resend;
+try {
+  // Try to load Resend with proper error handling
+  Resend = require('resend').Resend;
+  console.log('Resend module loaded successfully');
+} catch (error) {
+  console.error('Error loading Resend module:', error.message);
+  // Create a fallback implementation that will log errors but not crash
+  Resend = class FallbackResend {
+    constructor() {
+      console.warn('Using fallback Resend implementation - emails will not be sent');
+      this.domains = {
+        list: async () => ({ data: { data: [] }, error: null })
+      };
+      this.emails = {
+        send: async () => ({
+          data: { id: 'fallback-email-id' },
+          error: { message: 'Using fallback Resend implementation' }
+        })
+      };
+    }
+  };
+}
+
+// Use CommonJS require instead of ES Module import
+const dotenv = require('dotenv');
 
 // Load environment variables
 dotenv.config();
@@ -17,8 +44,21 @@ let resend = null;
  * @returns {Object} The Resend client instance
  */
 function getResendClient() {
-  if (!resend && process.env.RESEND_API_KEY) {
-    resend = new Resend(process.env.RESEND_API_KEY);
+  if (!resend) {
+    try {
+      // Only initialize if API key exists
+      if (process.env.RESEND_API_KEY) {
+        console.log('Initializing Resend client with API key');
+        resend = new Resend(process.env.RESEND_API_KEY);
+        console.log('Resend client initialized successfully');
+      } else {
+        console.warn('No Resend API key found in environment variables');
+        return null;
+      }
+    } catch (error) {
+      console.error('Failed to initialize Resend client:', error);
+      return null;
+    }
   }
   return resend;
 }
@@ -409,8 +449,8 @@ function getEmailTroubleshooting(error) {
   return troubleshooting;
 }
 
-// Export all functions as named exports
-export {
+// Export all functions using CommonJS module.exports
+module.exports = {
   testEmailConfig,
   sendEmail,
   sendTestEmail,
@@ -418,3 +458,6 @@ export {
   getEmailTroubleshooting,
   getResendClient
 };
+
+// Add explicit log for successful module load
+console.log('EmailService module loaded successfully in CommonJS format');

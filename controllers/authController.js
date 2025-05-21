@@ -6,18 +6,18 @@
 // --------------------------------------
 // Imports
 // --------------------------------------
-import { pool } from '../config/database.js';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-import Joi from 'joi';
-import nodemailer from 'nodemailer';
+const { pool } = require('../config/database');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const Joi = require('joi');
+const nodemailer = require('nodemailer');
 // Import required models
-import { UserModel } from '../models/UserModel.js';
-import { BlacklistedTokenModel } from '../models/BlacklistedTokenModel.js';
+const { UserModel } = require('../models/UserModel');
+const { BlacklistedTokenModel } = require('../models/BlacklistedTokenModel');
 // Import email service 
-import { sendPasswordResetEmail, testEmailConfig } from '../services/emailService.js';
-import { generateToken } from '../utils/jwt.js';
+const { sendPasswordResetEmail, testEmailConfig } = require('../services/emailService');
+const { generateToken } = require('../utils/jwt');
 
 // --------------------------------------
 // Database Helpers
@@ -1628,7 +1628,7 @@ const resetPassword = async (req, res) => {
 };
 
 // Export all controller methods
-export {
+module.exports = {
   // User authentication
   signup,
   login,
