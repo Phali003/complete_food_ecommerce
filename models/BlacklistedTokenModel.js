@@ -1,4 +1,4 @@
-const { query } = require('../config/database');
+const { pool } = require('../config/database');
 
 /**
  * BlacklistedToken Model - Handles storage and verification of invalidated tokens
@@ -11,11 +11,11 @@ class BlacklistedTokenModel {
    * @returns {Promise} Query result
    */
   static async blacklistToken(token, userId) {
-    const sql = `
+    const [result] = await pool.execute(`
       INSERT INTO blacklisted_tokens (token, user_id, blacklisted_at)
       VALUES (?, ?, NOW())
-    `;
-    return await query(sql, [token, userId]);
+    `, [token, userId]);
+    return result;
   }
 
   /**
@@ -24,12 +24,11 @@ class BlacklistedTokenModel {
    * @returns {Boolean} True if token is blacklisted
    */
   static async isBlacklisted(token) {
-    const sql = `
+    const [result] = await pool.execute(`
       SELECT COUNT(*) as count 
       FROM blacklisted_tokens 
       WHERE token = ? AND blacklisted_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
-    `;
-    const result = await query(sql, [token]);
+    `, [token]);
     return result[0].count > 0;
   }
 
@@ -38,11 +37,11 @@ class BlacklistedTokenModel {
    * @returns {Promise} Query result
    */
   static async cleanupOldTokens() {
-    const sql = `
+    const [result] = await pool.execute(`
       DELETE FROM blacklisted_tokens
       WHERE blacklisted_at <= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-    `;
-    return await query(sql);
+    `);
+    return result;
   }
 }
 

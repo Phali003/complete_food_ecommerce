@@ -1,89 +1,4 @@
 /**
- * Authentication controller for user management and authentication
- */
-const { pool } = require('../config/database');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
-const crypto = require('crypto');
-const { generateSecureToken, hashPassword, verifyPassword } = require('../utils/securityUtils');
-const emailService = require('../services/emailService');
-const BlacklistedTokenModel = require('../models/BlacklistedTokenModel');
-
-/**
- * Register a new user
- * @param {Object} req - HTTP request object
- * @param {Object} res - HTTP response object
- * @returns {Object} JSON response
- */
-const signup = async (req, res) => {
-  const { username, email, password, confirm_password } = req.body;
-  
-  try {
-    console.log('Processing signup request for:', email);
-    
-    // Input validation
-    if (!username || !email || !password || !confirm_password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide all required fields'
-      });
-    }
-    
-    if (password !== confirm_password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Passwords do not match'
-      });
-    }
-    
-    // Password strength validation
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!passwordRegex.test(password)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Password must contain at least 8 characters, including uppercase, lowercase, number and special character'
-      });
-    }
-    
-    let connection;
-    try {
-      connection = await pool.getConnection();
-      
-      // Check if user already exists
-      const [existingUsers] = await connection.execute(
-        'SELECT * FROM users WHERE email = ? OR username = ?',
-        [email, username]
-      );
-      
-      if (existingUsers.length > 0) {
-        const existingUser = existingUsers[0];
-        if (existingUser.email === email) {
-          return res.status(400).json({
-            success: false,
-            message: 'Email already in use'
-          });
-        }
-        if (existingUser.username === username) {
-          return res.status(400).json({
-            success: false,
-            message: 'Username already taken'
-          });
-        }
-      }
-      
-      // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      // Insert new user
-      const [result] = await connection.execute(
-        'INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)',
-        [username, email, hashedPassword, 'user']
-      );
-      
-      // Generate token
-      const token =
-
-/**
  * authController.js - Authentication and user management
  * Handles user authentication, admin management, and test endpoints
  */
@@ -91,14 +6,17 @@ const signup = async (req, res) => {
 // --------------------------------------
 // Imports
 // --------------------------------------
-const UserModel = require('../models/UserModel');
-const BlacklistedTokenModel = require('../models/BlacklistedTokenModel');
-const { generateToken } = require('../utils/jwt');
-const Joi = require('joi');
+const { pool } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const Joi = require('joi');
 const nodemailer = require('nodemailer');
-const { pool } = require('../config/database');
+// Import required models
+const UserModel = require('../models/UserModel');
+const BlacklistedTokenModel = require('../models/BlacklistedTokenModel');
+const emailService = require('../services/emailService');
+const { generateToken } = require('../utils/jwt');
 
 // --------------------------------------
 // Database Helpers

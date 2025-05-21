@@ -1,4 +1,4 @@
-const { query } = require("../config/database");
+const { pool } = require("../config/database");
 const bcrypt = require("bcryptjs");
 
 /**
@@ -17,13 +17,11 @@ class UserModel {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(password, salt);
 
-    // Insert user into database
-    const sql = `
+    // Insert user into database using pool.execute
+    const [result] = await pool.execute(`
       INSERT INTO users (username, email, password_hash, role)
       VALUES (?, ?, ?, ?)
-    `;
-
-    const result = await query(sql, [username, email, password_hash, role]);
+    `, [username, email, password_hash, role]);
 
     // Return user data (without password)
     return {
@@ -41,13 +39,11 @@ class UserModel {
    */
   static async findByEmail(email) {
     try {
-      const sql = `
+      const [users] = await pool.execute(`
         SELECT id, username, email, password_hash, role
         FROM users
         WHERE LOWER(email) = LOWER(?)
-      `;
-
-      const users = await query(sql, [email]);
+      `, [email]);
 
       // Return first user or null
       return users.length > 0 ? users[0] : null;
@@ -64,13 +60,11 @@ class UserModel {
    */
   static async findByUsername(username) {
     try {
-      const sql = `
+      const [users] = await pool.execute(`
         SELECT id, username, email, password_hash, role
         FROM users
         WHERE LOWER(username) = LOWER(?)
-      `;
-
-      const users = await query(sql, [username]);
+      `, [username]);
 
       return users.length > 0 ? users[0] : null;
     } catch (error) {
@@ -85,13 +79,11 @@ class UserModel {
    * @returns {Object|null} User data or null if not found
    */
   static async findById(id) {
-    const sql = `
+    const [users] = await pool.execute(`
       SELECT id, username, email, role, created_at, updated_at
       FROM users
       WHERE id = ?
-    `;
-
-    const users = await query(sql, [id]);
+    `, [id]);
 
     // Return first user or null
     return users.length > 0 ? users[0] : null;
@@ -107,13 +99,11 @@ class UserModel {
     // Extract updatable fields
     const { username, email } = userData;
 
-    const sql = `
+    const [result] = await pool.execute(`
       UPDATE users
       SET username = ?, email = ?
       WHERE id = ?
-    `;
-
-    const result = await query(sql, [username, email, id]);
+    `, [username, email, id]);
 
     return result.affectedRows > 0;
   }
@@ -129,13 +119,11 @@ class UserModel {
     const salt = await bcrypt.genSalt(10);
     const password_hash = await bcrypt.hash(newPassword, salt);
 
-    const sql = `
+    const [result] = await pool.execute(`
       UPDATE users
       SET password_hash = ?
       WHERE id = ?
-    `;
-
-    const result = await query(sql, [password_hash, id]);
+    `, [password_hash, id]);
 
     return result.affectedRows > 0;
   }
@@ -147,13 +135,11 @@ class UserModel {
    */
   static async exists(email) {
     try {
-      const sql = `
+      const [result] = await pool.execute(`
         SELECT COUNT(*) as count
         FROM users
         WHERE LOWER(email) = LOWER(?)
-      `;
-
-      const result = await query(sql, [email]);
+      `, [email]);
 
       return result[0].count > 0;
     } catch (error) {
@@ -169,14 +155,14 @@ class UserModel {
    * @returns {Array} List of users
    */
   static async getAllUsers(limit = 10, offset = 0) {
-    const sql = `
+    const [results] = await pool.execute(`
       SELECT id, username, email, role, created_at, updated_at
       FROM users
       ORDER BY created_at DESC
       LIMIT ? OFFSET ?
-    `;
-
-    return await query(sql, [limit, offset]);
+    `, [limit, offset]);
+    
+    return results;
   }
 
   /**
