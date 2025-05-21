@@ -88,6 +88,14 @@ const corsOptions = {
       return callback(null, true);
     }
     
+    // Special case for localhost testing in production mode
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      console.warn('⚠️ Allowing localhost in production mode for testing');
+      console.warn('⚠️ This should be restricted in a true production environment');
+      console.warn(`⚠️ Request origin: ${origin}`);
+      return callback(null, true);
+    }
+    
     // Check against specific allowed origins
     const allowedOrigins = [
       'https://fresh-eats-market.onrender.com',
